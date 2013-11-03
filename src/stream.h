@@ -23,7 +23,9 @@ class stream
 		static stream* find_connection(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port);
 
 		/* Get all stream objects */
-		static std::vector<stream*> list_connections();
+		static std::vector<const stream*> list_connections();
+
+
 
 		/* Register a sent byte range */
 		void register_sent(uint32_t seqno_start, uint32_t seqno_end, const timeval& timestamp);
@@ -31,15 +33,15 @@ class stream
 		/* Register an acknowledgement (ACK) */
 		void register_ack(uint32_t ackno, const timeval& timestamp);
 
+
+
 		/* 
 		 * Human readable string identifying the flow.
 		 * Example output: 10.0.0.1:8888=>10.0.0.2:9999
 		 */
 		std::string id();
 
-
-
-		/* Constructors, overloads for comparison operators and const-correctness stuff*/
+		/* Copy ctor, assignment ctor and const-correctness stuff */
 		stream(const stream& other)
 		{
 			*this = other;
@@ -52,10 +54,14 @@ class stream
 			return const_cast<stream*>(this)->id();
 		};
 
-
-
 	private:
 		stream(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port);
+
+		/* Helper function to adjust for sequence number wrapping */
+		inline uint64_t adjust(uint32_t seqno)
+		{
+			return seqno - first_seqno;
+		};
 
 		/* Stream identifiers */
 		uint32_t src;			// source IP address
@@ -71,6 +77,7 @@ class stream
 		uint32_t highest_ackd;	// the highest acknowledgement number received
 
 		// A map over byte ranges
+	public: // DEBUG
 		std::multimap<range,rangedata> ranges;
 
 		/* Data aggregated over intervals/time slices */

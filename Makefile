@@ -2,13 +2,13 @@ NAME=losscalc
 
 CC=$(if $(shell which colorgcc),colorgcc,gcc)
 LD := gcc
-CFLAGS := -Wall -Wextra -pedantic -g
+CFLAGS := -Wall -Wextra -pedantic
 LDLIBS := pthread stdc++ pcap
 
 SRC := $(shell find src/ -type f -regextype posix-extended -regex ".+\.(c|cpp)")
 HDR := $(shell find src/ -type f -regextype posix-extended -regex ".+\.h")
 ALL := $(SRC) $(HDR) README.md LICENSE Makefile
-DEF := ETHERNET_FRAME_SIZE=14
+DEF := ETHERNET_FRAME_SIZE=14 
 OBJ := $(filter %.o,$(SRC:src/%.c=build/c_%.o)) $(filter %.o,$(SRC:src/%.cpp=build/cpp_%.o))
 
 .PHONY: $(NAME) all clean realclean todo
@@ -34,4 +34,4 @@ build/c_%.o: src/%.c
 
 build/cpp_%.o: src/%.cpp
 	-@mkdir -p build
-	$(CC) -std=gnu++98 -x c++ $(CFLAGS) -o $@ -c $< $(addprefix -D,$(DEF))
+	$(CC) -std=gnu++98 -x c++ $(CFLAGS) $(if $(filter NDEBUG,$(DEF)),-O3,-g) -o $@ -c $< $(addprefix -D,$(DEF))

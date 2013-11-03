@@ -42,7 +42,8 @@ class rangedata
 
 		rangedata& operator=(const rangedata& other);
 
-	private:
+		//DEBUG
+	//private: 
 		std::vector<timeval> sent;	// the timestamps this range was registered as sent
 		std::vector<timeval> ackd;	// the timestamps this range was acknowledged
 };
@@ -57,42 +58,17 @@ class range
 	friend class rangedata;
 	friend class stream;
 
-	private:
-		uint32_t seqno_lo;	// the lower sequence number in the range (range start)
-		uint32_t seqno_hi;	// the upper sequence number in the range (range end)
+	//private:
+	public: // DEBUG
+		uint64_t seqno_lo;	// the lower sequence number in the range (range start)
+		uint64_t seqno_hi;	// the upper sequence number in the range (range end)
 
 	public:
-		range(uint32_t lo, uint32_t hi)
-			: seqno_lo(lo), seqno_hi(hi)
-		{
-		};
-
-		range(const range& other)
-		{
-			*this = other;
-		};
-
-		range& operator=(const range& other)
-		{
-			seqno_lo = other.seqno_lo;
-			seqno_hi = other.seqno_hi;
-			return *this;
-		};
-
-		bool operator<(const range& other)
-		{
-			if (seqno_hi <= other.seqno_lo)
-				return true;
-			if (seqno_lo >= other.seqno_hi)
-				return false;
-
-			return false;
-		};
-
-		bool operator<(const range& other) const
-		{
-			return const_cast<range*>(this)->operator<(other);
-		};
+		range(uint64_t seqno_start, uint64_t seqno_end);
+		range(const range& other);
+		range& operator=(const range& rhs);
+		bool operator<(const range& rhs);
+		bool operator<(const range& rhs) const;
 };
 
 #endif

@@ -57,7 +57,7 @@ int analyze_streams(pcap_t* handle)
 
 		// Process data
 		stream* sender = stream::find_connection(src_addr, src_port, dst_addr, dst_port);
-		sender->register_sent(seq_no, data_len, hdr->ts);
+		sender->register_sent(seq_no, seq_no + data_len, hdr->ts);
 
 		stream* receiver = stream::find_connection(dst_addr, dst_port, src_addr, src_port);
 		receiver->register_ack(ack_no, hdr->ts);

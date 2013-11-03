@@ -1,15 +1,114 @@
 #include "stream.h"
+#include "range.h"
 #include <map>
 #include <vector>
 #include <string>
 #include <tr1/cstdint>
 #include <arpa/inet.h>
 #include <sstream>
+#include <assert.h>
 
-using std::string;
-using std::multimap;
-using std::vector;
-using std::map;
+#ifndef NDEBUG
+#include <cstdio>
+#endif
+
+using namespace std;
+
+
+
+typedef multimap< range, rangedata > rmaptype;
+
+
+void stream::register_sent(uint32_t start, uint32_t end, const timeval& ts)
+{
+	range key(adjust(start), adjust(end));
+	rmaptype::iterator it, last, lo, hi, inserted;
+
+	lo = ranges.lower_bound(key);
+	hi = ranges.upper_bound(key);
+
+	if (lo == hi)
+	{
+		// We have a completely new range
+		ranges.insert(pair<range,rangedata>(key, ts));
+		return;
+	}
+
+	last = hi--;
+
+	// Check if we have new leading data
+	if (key.seqno_lo < lo->first.seqno_lo)
+	{
+		ranges.insert(lo, rmaptype::value_type(range(key.seqno_lo, lo->first.seqno_lo), lo->second));
+	}
+
+	// Check if we have new trailing data
+	if (key.seqno_hi > hi->first.seqno_hi)
+	{
+		last = ranges.insert(hi, rmaptype::value_type(range(hi->first.seqno_hi, key.seqno_hi), hi->second));
+	}
+
+	// Find partial matches and split existing ranges
+	for (it = lo; it != last;)
+	{
+		range curr(it->first);
+		rangedata& data = it->second;
+
+		if (key.seqno_lo <= curr.seqno_lo && key.seqno_hi >= curr.seqno_hi)
+		{
+			// Existing range:  |-----|
+			// New range:       |-----| 
+			inserted = it++;
+		}
+
+		else if (key.seqno_lo > curr.seqno_lo && key.seqno_hi < curr.seqno_hi)
+		{
+			// Existing range: |-----|
+			// New range:        |-| 
+			ranges.insert(it, rmaptype::value_type(range(curr.seqno_lo, key.seqno_lo), data));
+			inserted = ranges.insert(it, rmaptype::value_type(range(key.seqno_lo, key.seqno_hi), data));
+			ranges.insert(it, rmaptype::value_type(range(key.seqno_hi, curr.seqno_hi), data));
+			ranges.erase(it++);
+		}
+
+		else if (key.seqno_lo > it->first.seqno_lo)
+		{
+			// Existing range: |-----|
+			// New range:        |---|
+			ranges.insert(it, rmaptype::value_type(range(curr.seqno_lo, key.seqno_lo), data));
+			inserted = ranges.insert(it, rmaptype::value_type(range(key.seqno_lo, curr.seqno_hi), data));
+			ranges.erase(it++);
+		}
+
+		else if (key.seqno_hi < it->first.seqno_hi)
+		{
+			// Existing range: |-----|
+			// New range:      |---|
+			inserted = ranges.insert(it, rmaptype::value_type(range(curr.seqno_lo, key.seqno_hi), data));
+			ranges.insert(it, rmaptype::value_type(range(key.seqno_hi, curr.seqno_hi), data));
+			ranges.erase(it++);
+		}
+
+		else
+		{
+			// This really shouldn't happen!
+			assert(false);
+		}
+
+		inserted->second.sent.push_back(ts);
+	}
+
+}
+
+
+
+void stream::register_ack(uint32_t ackno, const timeval& ts)
+{
+}
+
+
+
+
 
 /* Lighweight object used to map connections to addresses and ports */
 struct stream_key
@@ -68,15 +167,15 @@ struct stream_key
 	};
 };
 
+
+
 /* Define our map type */
-typedef map< stream_key, stream > maptype;
-
-
+typedef map< stream_key, stream > smaptype;
 
 
 
 /* A map over all streams/connections */
-static maptype connections;
+static smaptype connections;
 
 
 
@@ -86,7 +185,7 @@ bool stream::create_connection(uint32_t src, uint16_t sport, uint32_t dst, uint1
 	stream_key key(src, dst, sport, dport);
 
 	// Try to find stream in the connection map
-	maptype::iterator lower_bound = connections.lower_bound(key);
+	smaptype::iterator lower_bound = connections.lower_bound(key);
 
 	if (lower_bound != connections.end() && !(connections.key_comp()(key, lower_bound->first)))
 	{
@@ -98,7 +197,7 @@ bool stream::create_connection(uint32_t src, uint16_t sport, uint32_t dst, uint1
 	}
 
 	// Stream was not found, we have to create it
-	maptype::iterator element = connections.insert(lower_bound, maptype::value_type(key, stream(src, sport, dst, dport)));
+	smaptype::iterator element = connections.insert(lower_bound, smaptype::value_type(key, stream(src, sport, dst, dport)));
 	element->second.first_seqno = seqno;
 	element->second.first_segment = ts;
 	element->second.last_segment = ts;
@@ -110,7 +209,7 @@ bool stream::create_connection(uint32_t src, uint16_t sport, uint32_t dst, uint1
 /* Find a stream or create it if it doesn't exist */
 stream* stream::find_connection(uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport)
 {
-	maptype::iterator found = connections.find(stream_key(src, dst, sport, dport));
+	smaptype::iterator found = connections.find(stream_key(src, dst, sport, dport));
 
 	if (found != connections.end())
 	{
@@ -123,11 +222,11 @@ stream* stream::find_connection(uint32_t src, uint16_t sport, uint32_t dst, uint
 
 
 /* Create a list with references to the existing streams */
-vector<stream*> stream::list_connections()
+vector<const stream*> stream::list_connections()
 {
-	vector<stream*> conns;
+	vector<const stream*> conns;
 
-	for (maptype::iterator it = connections.begin(); it != connections.end(); it++)
+	for (smaptype::iterator it = connections.begin(); it != connections.end(); it++)
 	{
 		conns.push_back(&(it->second));
 	}
@@ -136,16 +235,6 @@ vector<stream*> stream::list_connections()
 }
 
 
-
-void stream::register_sent(uint32_t start, uint32_t end, const timeval& ts)
-{
-}
-
-
-
-void stream::register_ack(uint32_t ackno, const timeval& ts)
-{
-}
 
 
 
@@ -163,6 +252,8 @@ stream& stream::operator=(const stream& rhs)
 	dst = rhs.dst;
 	sport = rhs.sport;
 	dport = rhs.dport;
+	first_seqno = rhs.first_seqno;
+	first_segment = rhs.first_segment;
 
 	return *this;
 }
@@ -177,7 +268,7 @@ string stream::id()
 		uint8_t str[4];
 	} info;
 
-	std::ostringstream connstr;
+	ostringstream connstr;
 
 	info.addr = src;
 	connstr << ((int) info.str[0]);
@@ -205,3 +296,4 @@ string stream::id()
 
 	return connstr.str();
 }
+
