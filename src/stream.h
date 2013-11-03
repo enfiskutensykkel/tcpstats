@@ -16,6 +16,8 @@ class stream
 			*this = other;
 		};
 
+		void register_range(uint64_t seqno_start, uint64_t seqno_end);
+
 		bool operator<(const stream& other);
 
 		bool operator<(const stream& other) const

@@ -8,10 +8,11 @@
 
 class stream;
 
+
 class range
 {
 	public:
-		range(uint64_t sequence_number_start, uint64_t sequence_number_end, const timeval& registered);
+		range(uint64_t seqno_start, uint64_t seqno_end, const timeval& registered);
 
 		range(const range& other)
 		{
@@ -20,14 +21,23 @@ class range
 
 		range& operator=(const range& other);
 
+		bool operator<(const range& other);
+
+		bool operator<(const range& other) const
+		{
+			return const_cast<range*>(this)->operator<(other);
+		};
+
 	private:
-		std::vector<timeval> reg_times;
-		std::vector<timeval> ack_times;
+
+		std::vector<timeval> registered;
+		timeval acked;
 
 		uint64_t seq_lo;
 		uint64_t seq_hi;
 
 		friend class stream;
+		friend struct comparator;
 };
 
 #endif
