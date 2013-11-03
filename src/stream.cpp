@@ -16,7 +16,7 @@ using namespace std;
 
 
 
-void stream::search_ranges(range_list& list, range& key)
+void stream::get_ranges(range_list& list, range& key, bool include)
 {
 	range_map::iterator it, last, lo, hi, inserted;
 
@@ -33,13 +33,17 @@ void stream::search_ranges(range_list& list, range& key)
 	// Check if we have new leading data
 	if (key.seqno_lo < lo->first.seqno_lo)
 	{
-		ranges.insert(lo, range_map::value_type(range(key.seqno_lo, lo->first.seqno_lo), lo->second));
+		inserted = ranges.insert(lo, range_map::value_type(range(key.seqno_lo, lo->first.seqno_lo), lo->second));
+		if (include)
+			list.push_back(inserted);
 	}
 
 	// Check if we have new trailing data
 	if (key.seqno_hi > hi->first.seqno_hi)
 	{
 		last = ranges.insert(hi, range_map::value_type(range(hi->first.seqno_hi, key.seqno_hi), hi->second));
+		if (include)
+			list.push_back(last);
 	}
 
 	// Find partial matches and split existing ranges
@@ -101,7 +105,7 @@ void stream::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 {
 	range key(adjust(start), adjust(end));
 	range_list ranges;
-	search_ranges(ranges, key);
+	get_ranges(ranges, key, false);
 
 	// TODO: update last_segment if ts > last_segment
 

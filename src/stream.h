@@ -83,7 +83,7 @@ class stream
 
 		/* Helper method to match and split ranges */
 		typedef std::list< range_map::iterator > range_list;
-		inline void search_ranges(range_list& list, range& key);
+		inline void get_ranges(range_list& list, range& key, bool include_new);
 
 		/* Data aggregated over intervals/time slices */
 		std::vector<uint64_t> throughput;
