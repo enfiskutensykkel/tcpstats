@@ -6,6 +6,7 @@
 #include <sys/time.h>
 #include <vector>
 #include <map>
+#include <list>
 #include "range.h"
 
 
@@ -54,14 +55,8 @@ class stream
 			return const_cast<stream*>(this)->id();
 		};
 
-	private:
+	//private:
 		stream(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port);
-
-		/* Helper function to adjust for sequence number wrapping */
-		inline uint64_t adjust(uint32_t seqno)
-		{
-			return seqno - first_seqno;
-		};
 
 		/* Stream identifiers */
 		uint32_t src;			// source IP address
@@ -74,11 +69,21 @@ class stream
 		uint64_t rtt;			// the lowest registered delay (which we assume to be the RTT)
 		timeval first_segment,	// stream duration (first registered segment, and last registered segment)
 				last_segment;
-		uint32_t highest_ackd;	// the highest acknowledgement number received
+		uint64_t highest_ackd;	// the highest acknowledgement number received
 
 		// A map over byte ranges
-	public: // DEBUG
-		std::multimap<range,rangedata> ranges;
+		typedef std::multimap< range, rangedata > range_map;
+		range_map ranges;
+
+		/* Helper method to adjust for sequence number wrapping */
+		inline uint64_t adjust(uint32_t seqno)
+		{
+			return seqno - first_seqno;
+		};
+
+		/* Helper method to match and split ranges */
+		typedef std::list< range_map::iterator > range_list;
+		inline void search_ranges(range_list& list, range& key);
 
 		/* Data aggregated over intervals/time slices */
 		std::vector<uint64_t> throughput;

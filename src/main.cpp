@@ -52,7 +52,7 @@ int main(int argc, char** argv)
 //	s->register_sent(25, 35, tv);
 
 	// Partial match with both trailing and leading data
-	s->register_sent(0, 50, tv);
+	s->register_sent(9, 15, tv);
 	
 
 

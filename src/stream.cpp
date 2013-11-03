@@ -16,21 +16,15 @@ using namespace std;
 
 
 
-typedef multimap< range, rangedata > rmaptype;
-
-
-void stream::register_sent(uint32_t start, uint32_t end, const timeval& ts)
+void stream::search_ranges(range_list& list, range& key)
 {
-	range key(adjust(start), adjust(end));
-	rmaptype::iterator it, last, lo, hi, inserted;
+	range_map::iterator it, last, lo, hi, inserted;
 
 	lo = ranges.lower_bound(key);
 	hi = ranges.upper_bound(key);
 
 	if (lo == hi)
 	{
-		// We have a completely new range
-		ranges.insert(pair<range,rangedata>(key, ts));
 		return;
 	}
 
@@ -39,13 +33,13 @@ void stream::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 	// Check if we have new leading data
 	if (key.seqno_lo < lo->first.seqno_lo)
 	{
-		ranges.insert(lo, rmaptype::value_type(range(key.seqno_lo, lo->first.seqno_lo), lo->second));
+		ranges.insert(lo, range_map::value_type(range(key.seqno_lo, lo->first.seqno_lo), lo->second));
 	}
 
 	// Check if we have new trailing data
 	if (key.seqno_hi > hi->first.seqno_hi)
 	{
-		last = ranges.insert(hi, rmaptype::value_type(range(hi->first.seqno_hi, key.seqno_hi), hi->second));
+		last = ranges.insert(hi, range_map::value_type(range(hi->first.seqno_hi, key.seqno_hi), hi->second));
 	}
 
 	// Find partial matches and split existing ranges
@@ -65,9 +59,9 @@ void stream::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 		{
 			// Existing range: |-----|
 			// New range:        |-| 
-			ranges.insert(it, rmaptype::value_type(range(curr.seqno_lo, key.seqno_lo), data));
-			inserted = ranges.insert(it, rmaptype::value_type(range(key.seqno_lo, key.seqno_hi), data));
-			ranges.insert(it, rmaptype::value_type(range(key.seqno_hi, curr.seqno_hi), data));
+			ranges.insert(it, range_map::value_type(range(curr.seqno_lo, key.seqno_lo), data));
+			inserted = ranges.insert(it, range_map::value_type(range(key.seqno_lo, key.seqno_hi), data));
+			ranges.insert(it, range_map::value_type(range(key.seqno_hi, curr.seqno_hi), data));
 			ranges.erase(it++);
 		}
 
@@ -75,8 +69,8 @@ void stream::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 		{
 			// Existing range: |-----|
 			// New range:        |---|
-			ranges.insert(it, rmaptype::value_type(range(curr.seqno_lo, key.seqno_lo), data));
-			inserted = ranges.insert(it, rmaptype::value_type(range(key.seqno_lo, curr.seqno_hi), data));
+			ranges.insert(it, range_map::value_type(range(curr.seqno_lo, key.seqno_lo), data));
+			inserted = ranges.insert(it, range_map::value_type(range(key.seqno_lo, curr.seqno_hi), data));
 			ranges.erase(it++);
 		}
 
@@ -84,8 +78,8 @@ void stream::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 		{
 			// Existing range: |-----|
 			// New range:      |---|
-			inserted = ranges.insert(it, rmaptype::value_type(range(curr.seqno_lo, key.seqno_hi), data));
-			ranges.insert(it, rmaptype::value_type(range(key.seqno_hi, curr.seqno_hi), data));
+			inserted = ranges.insert(it, range_map::value_type(range(curr.seqno_lo, key.seqno_hi), data));
+			ranges.insert(it, range_map::value_type(range(key.seqno_hi, curr.seqno_hi), data));
 			ranges.erase(it++);
 		}
 
@@ -95,9 +89,35 @@ void stream::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 			assert(false);
 		}
 
-		inserted->second.sent.push_back(ts);
+		list.push_back(inserted);
 	}
 
+	return;
+}
+
+
+
+void stream::register_sent(uint32_t start, uint32_t end, const timeval& ts)
+{
+	range key(adjust(start), adjust(end));
+	range_list ranges;
+	search_ranges(ranges, key);
+
+	// TODO: update last_segment if ts > last_segment
+
+	if (ranges.empty())
+	{
+		// We have a completely new range
+		this->ranges.insert(pair<range,rangedata>(key, ts));
+	}
+	else
+	{
+		// Update existing ranges
+		for (range_list::iterator i = ranges.begin(); i != ranges.end(); ++i)
+		{
+			(*i)->second.sent.push_back(ts);
+		}
+	}
 }
 
 
@@ -170,12 +190,12 @@ struct stream_key
 
 
 /* Define our map type */
-typedef map< stream_key, stream > smaptype;
+typedef map< stream_key, stream > stream_map;
 
 
 
 /* A map over all streams/connections */
-static smaptype connections;
+static stream_map connections;
 
 
 
@@ -185,20 +205,22 @@ bool stream::create_connection(uint32_t src, uint16_t sport, uint32_t dst, uint1
 	stream_key key(src, dst, sport, dport);
 
 	// Try to find stream in the connection map
-	smaptype::iterator lower_bound = connections.lower_bound(key);
+	stream_map::iterator lower_bound = connections.lower_bound(key);
 
 	if (lower_bound != connections.end() && !(connections.key_comp()(key, lower_bound->first)))
 	{
 		// Stream was found
 		lower_bound->second.first_seqno = seqno;
+		lower_bound->second.highest_ackd = seqno;
 		lower_bound->second.first_segment = ts;
 		lower_bound->second.last_segment = ts;
 		return false;
 	}
 
 	// Stream was not found, we have to create it
-	smaptype::iterator element = connections.insert(lower_bound, smaptype::value_type(key, stream(src, sport, dst, dport)));
+	stream_map::iterator element = connections.insert(lower_bound, stream_map::value_type(key, stream(src, sport, dst, dport)));
 	element->second.first_seqno = seqno;
+	element->second.highest_ackd = seqno;
 	element->second.first_segment = ts;
 	element->second.last_segment = ts;
 	return true;
@@ -209,7 +231,7 @@ bool stream::create_connection(uint32_t src, uint16_t sport, uint32_t dst, uint1
 /* Find a stream or create it if it doesn't exist */
 stream* stream::find_connection(uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport)
 {
-	smaptype::iterator found = connections.find(stream_key(src, dst, sport, dport));
+	stream_map::iterator found = connections.find(stream_key(src, dst, sport, dport));
 
 	if (found != connections.end())
 	{
@@ -226,7 +248,7 @@ vector<const stream*> stream::list_connections()
 {
 	vector<const stream*> conns;
 
-	for (smaptype::iterator it = connections.begin(); it != connections.end(); it++)
+	for (stream_map::iterator it = connections.begin(); it != connections.end(); it++)
 	{
 		conns.push_back(&(it->second));
 	}
