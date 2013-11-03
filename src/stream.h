@@ -16,29 +16,19 @@
 class stream
 {
 	public:
-		/*
-		 * Create a stream object.
-		 */
+		/* Create a stream object */
 		static bool create_connection(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port, uint32_t first_seqno, const timeval& first_timestamp);
 
-		/*
-		 * Retrieve a stream object.
-		 */
+		/* Retrieve a stream object */
 		static stream* find_connection(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port);
 
-		/*
-		 * Get all stream objects.
-		 */
+		/* Get all stream objects */
 		static std::vector<stream*> list_connections();
 
-		/*
-		 * Register a sent byte range.
-		 */
+		/* Register a sent byte range */
 		void register_sent(uint32_t seqno_start, uint32_t seqno_end, const timeval& timestamp);
 
-		/*
-		 * Register an acknowledgement.
-		 */
+		/* Register an acknowledgement (ACK) */
 		void register_ack(uint32_t ackno, const timeval& timestamp);
 
 		/* 
@@ -46,6 +36,7 @@ class stream
 		 * Example output: 10.0.0.1:8888=>10.0.0.2:9999
 		 */
 		std::string id();
+
 
 
 		/* Constructors, overloads for comparison operators and const-correctness stuff*/
@@ -60,6 +51,8 @@ class stream
 		{
 			return const_cast<stream*>(this)->id();
 		};
+
+
 
 	private:
 		stream(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port);
