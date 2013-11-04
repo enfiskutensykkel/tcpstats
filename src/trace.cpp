@@ -43,7 +43,9 @@ void analyze_trace(pcap_t* handle)
 {
 	pcap_pkthdr* hdr;
 	const u_char* pkt;
-	flowdata* data = NULL;
+
+	flowdata* data;
+	const flow* conn;
 
 	// TODO: Do an extra call to pcap_next_ex and find the first timestamp
 
@@ -66,29 +68,17 @@ void analyze_trace(pcap_t* handle)
 		// Find TCP payload length
 		uint16_t data_len = ntohs(*((uint16_t*) (pkt + ETHERNET_FRAME_SIZE + 2))) - tcp_off - data_off; // Ethernet frame size - total size of headers
 		
-		// Create connection if SYN flag is set
-		if ((*((uint8_t*) (pkt + ETHERNET_FRAME_SIZE + tcp_off + 13)) &0x02))
+		// Locate connection and update connection data
+		if (flow::find_connection(conn, data, src_addr, src_port, dst_addr, dst_port, seq_no, hdr->ts))
 		{
-			data = &flow::create_connection(src_addr, src_port, dst_addr, dst_port, seq_no, hdr->ts);
+			// New connection. If not SYN is set, the trace has missing data.
+			assert(((*((uint8_t*) (pkt + ETHERNET_FRAME_SIZE + tcp_off + 13)) &0x02)));
 		}
 
-		// Locate connection data and update segment count
-		else if ((data = flow::find_connection(src_addr, src_port, dst_addr, dst_port)) == NULL)
-		{
-			// Didn't catch SYN for this connection, is trace missing packets?
-			data = &flow::create_connection(src_addr, src_port, dst_addr, dst_port, seq_no, hdr->ts);
-		}
-
-		if (data_len > 0)
-		{
-			data->register_sent(seq_no, seq_no + data_len, hdr->ts);
-		}
+		data->register_sent(seq_no, seq_no + data_len, hdr->ts);
 
 		// Locate reverse connection and update ACK count
-		if ((data = flow::find_connection(dst_addr, dst_port, src_addr, src_port)) == NULL)
-		{
-			data = &flow::create_connection(dst_addr, dst_port, src_addr, src_port, seq_no, hdr->ts);
-		}
+		flow::find_connection(conn, data, dst_addr, dst_port, src_addr, src_port, ack_no, hdr->ts); // FIXME: ack_no? seq_no?
 		data->register_ack(ack_no, hdr->ts);
 	}
 }

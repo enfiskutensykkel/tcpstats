@@ -60,41 +60,31 @@ flow& flow::operator=(const flow& rhs)
 
 
 
-flowdata& flow::create_connection(uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport, uint32_t seqno, const timeval& ts)
+bool flow::find_connection(const flow*& conn, flowdata*& data, uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport, uint32_t seqno, const timeval& ts)
 {
 	flow key(src, dst, sport, dport);
 
 	// Try to find flow in the connection map
-	flow_map::iterator lower_bound = connections.lower_bound(key);
+	flow_map::iterator f = connections.lower_bound(key);
 
-	if (lower_bound != connections.end() && !(connections.key_comp()(key, lower_bound->first)))
+	if (f != connections.end() && !(connections.key_comp()(key, f->first)))
 	{
 		// Flow was found
-		// Assume that its data has already been set
-		return lower_bound->second;
+		conn = &f->first;
+		data = &f->second;
+		return false;
 	}
 
 	// Flow was not found, we have to create it
-	return connections.insert(lower_bound, flow_map::value_type(key, flowdata(seqno, ts)))->second;
+	f = connections.insert(f, flow_map::value_type(key, flowdata(seqno, ts)));
+	conn = &f->first;
+	data = &f->second;
+	return true;
 }
 
 
 
-flowdata* flow::find_connection(uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport)
-{
-	flow_map::iterator found = connections.find(flow(src, sport, dst, dport));
-
-	if (found != connections.end())
-	{
-		return &found->second;
-	}
-
-	return NULL;
-}
-
-
-
-int flow::list_connections(vector<const flow*> conns, vector<const flowdata*> fdata)
+int flow::list_connections(vector<const flow*>& conns, vector<const flowdata*>& fdata)
 {
 	int flows = 0;
 

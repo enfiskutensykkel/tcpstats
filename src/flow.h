@@ -19,14 +19,11 @@ class flowdata;
 class flow
 {
 	public:
-		/* Create a connection */
-		static flowdata& create_connection(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port, uint32_t first_seqno, const timeval& first_timestamp);
+		/* Retrieve a connection or create it if it doesn't exist */
+		static bool find_connection(const flow*& flow, flowdata*& data, uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port, uint32_t first_seqno, const timeval& first_timestamp);
 
-		/* Retrieve flow data */
-		static flowdata* find_connection(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port);
-
-		/* Get a list of all connections */
-		static int list_connections(std::vector<const flow*> connections, std::vector<const flowdata*> data);
+		/* Get a list of all existing connections */
+		static int list_connections(std::vector<const flow*>& connections, std::vector<const flowdata*>& data);
 
 		/* 
 		 * Human readable string identifying the flow.
@@ -59,7 +56,7 @@ class flow
 		uint16_t sport;			// source port
 		uint16_t dport;			// destination port
 
-		/* Connection to flowdata map  */
+		/* Map of existing connections  */
 		typedef std::map< flow, flowdata > flow_map;
 		static flow_map connections;
 };
@@ -101,11 +98,8 @@ class flowdata
 		typedef std::multimap< range, rangedata > range_map;
 		range_map ranges;
 
-		/* Helper method to adjust for sequence number wrapping */
-		inline uint64_t adjust(uint32_t seqno)
-		{
-			return seqno - first_seqno;
-		};
+		/* Helper macro to adjust for sequence number wrapping */
+#define adjust(seqno) ( (uint64_t) (seqno) - (this->first_seqno) )
 
 		/* Helper method to match and split ranges */
 		typedef std::list< rangedata* > range_list;

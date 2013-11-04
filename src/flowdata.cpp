@@ -96,16 +96,19 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 
 void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 {
+	// TODO: update last_segment if ts > last_segment
+	
+	// Check if there actually is any data to update
 	if ((end - start) == 0)
 	{
 		return;
 	}
 
+	// Find byte ranges that has matches
 	range key(adjust(start), adjust(end));
 	range_list ranges;
 	get_ranges(ranges, key, false);
 
-	// TODO: update last_segment if ts > last_segment
 
 	if (ranges.empty())
 	{
@@ -114,7 +117,7 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 	}
 	else
 	{
-		// Update existing ranges
+		// Update existing ranges' transmission count
 		for (range_list::iterator i = ranges.begin(); i != ranges.end(); ++i)
 		{
 			(*i)->sent.push_back(ts);
