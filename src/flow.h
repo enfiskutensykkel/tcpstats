@@ -20,7 +20,7 @@ class flow
 {
 	public:
 		/* Retrieve a connection or create it if it doesn't exist */
-		static bool find_connection(const flow*& flow, flowdata*& data, uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port, uint32_t first_seqno, const timeval& first_timestamp);
+		static bool find_connection(const flow*& flow, flowdata*& data, uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port, uint32_t seqno, const timeval& timestamp);
 
 		/* Get a list of all existing connections */
 		static int list_connections(std::vector<const flow*>& connections, std::vector<const flowdata*>& data);
