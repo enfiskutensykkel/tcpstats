@@ -8,10 +8,9 @@
 
 
 
-
 void flowdata::get_ranges(range_list& list, range& key, bool include)
 {
-	range_map::iterator it, last, lo, hi, inserted;
+	range_map::iterator curr, next, last, lo, hi, ins;
 
 	lo = ranges.lower_bound(key);
 	hi = ranges.upper_bound(key);
@@ -26,9 +25,9 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 	// Check if we have new leading data
 	if (key.seqno_lo < lo->first.seqno_lo)
 	{
-		inserted = ranges.insert(lo, range_map::value_type(range(key.seqno_lo, lo->first.seqno_lo), lo->second));
+		ins = ranges.insert(lo, range_map::value_type(range(key.seqno_lo, lo->first.seqno_lo), lo->second));
 		if (include)
-			list.push_back(inserted);
+			list.push_back(&ins->second);
 	}
 
 	// Check if we have new trailing data
@@ -36,48 +35,49 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 	{
 		last = ranges.insert(hi, range_map::value_type(range(hi->first.seqno_hi, key.seqno_hi), hi->second));
 		if (include)
-			list.push_back(last);
+			list.push_back(&last->second);
 	}
 
 	// Find partial matches and split existing ranges
-	for (it = lo; it != last;)
+	for (curr = next = lo; curr != last; curr = next)
 	{
-		range curr(it->first);
-		rangedata& data = it->second;
+		++next;
+		const range& rrange = curr->first;
+		rangedata& data = curr->second;
 
-		if (key.seqno_lo <= curr.seqno_lo && key.seqno_hi >= curr.seqno_hi)
+		if (key.seqno_lo <= rrange.seqno_lo && key.seqno_hi >= rrange.seqno_hi)
 		{
 			// Existing range:  |-----|
-			// New range:       |-----| 
-			inserted = it++;
+			// New range:       <-----> 
+			ins = curr;
 		}
 
-		else if (key.seqno_lo > curr.seqno_lo && key.seqno_hi < curr.seqno_hi)
+		else if (key.seqno_lo > rrange.seqno_lo && key.seqno_hi < rrange.seqno_hi)
 		{
 			// Existing range: |-----|
 			// New range:        |-| 
-			ranges.insert(it, range_map::value_type(range(curr.seqno_lo, key.seqno_lo), data));
-			inserted = ranges.insert(it, range_map::value_type(range(key.seqno_lo, key.seqno_hi), data));
-			ranges.insert(it, range_map::value_type(range(key.seqno_hi, curr.seqno_hi), data));
-			ranges.erase(it++);
+			ranges.insert(curr, range_map::value_type(range(rrange.seqno_lo, key.seqno_lo), data));
+			ins = ranges.insert(curr, range_map::value_type(range(key.seqno_lo, key.seqno_hi), data));
+			ranges.insert(curr, range_map::value_type(range(key.seqno_hi, rrange.seqno_hi), data));
+			ranges.erase(curr);
 		}
 
-		else if (key.seqno_lo > it->first.seqno_lo)
+		else if (key.seqno_lo > rrange.seqno_lo)
 		{
 			// Existing range: |-----|
 			// New range:        |---|
-			ranges.insert(it, range_map::value_type(range(curr.seqno_lo, key.seqno_lo), data));
-			inserted = ranges.insert(it, range_map::value_type(range(key.seqno_lo, curr.seqno_hi), data));
-			ranges.erase(it++);
+			ranges.insert(curr, range_map::value_type(range(rrange.seqno_lo, key.seqno_lo), data));
+			ins = ranges.insert(curr, range_map::value_type(range(key.seqno_lo, rrange.seqno_hi), data));
+			ranges.erase(curr);
 		}
 
-		else if (key.seqno_hi < it->first.seqno_hi)
+		else if (key.seqno_hi < rrange.seqno_hi)
 		{
 			// Existing range: |-----|
 			// New range:      |---|
-			inserted = ranges.insert(it, range_map::value_type(range(curr.seqno_lo, key.seqno_hi), data));
-			ranges.insert(it, range_map::value_type(range(key.seqno_hi, curr.seqno_hi), data));
-			ranges.erase(it++);
+			ins = ranges.insert(curr, range_map::value_type(range(rrange.seqno_lo, key.seqno_hi), data));
+			ranges.insert(curr, range_map::value_type(range(key.seqno_hi, rrange.seqno_hi), data));
+			ranges.erase(curr);
 		}
 
 		else
@@ -86,7 +86,7 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 			assert(false);
 		}
 
-		list.push_back(inserted);
+		list.push_back(&ins->second);
 	}
 
 	return;
@@ -96,6 +96,11 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 
 void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 {
+	if ((end - start) == 0)
+	{
+		return;
+	}
+
 	range key(adjust(start), adjust(end));
 	range_list ranges;
 	get_ranges(ranges, key, false);
@@ -112,7 +117,7 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 		// Update existing ranges
 		for (range_list::iterator i = ranges.begin(); i != ranges.end(); ++i)
 		{
-			(*i)->second.sent.push_back(ts);
+			(*i)->sent.push_back(ts);
 		}
 	}
 }
@@ -142,4 +147,5 @@ flowdata& flowdata::operator=(const flowdata& rhs)
 	last_ts = rhs.last_ts;
 
 	// TODO: Only copy the members that needs to be copied, we should avoid deep-copies anyway
+	return *this;
 }

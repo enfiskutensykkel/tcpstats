@@ -23,6 +23,7 @@ range& range::operator=(const range& rhs)
 {
 	seqno_lo = rhs.seqno_lo;
 	seqno_hi = rhs.seqno_hi;
+
 	return *this;
 }
 

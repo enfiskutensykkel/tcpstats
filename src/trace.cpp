@@ -38,7 +38,7 @@ void set_filter(pcap_t* handle, const filter& filter)
 }
 
 
-
+#include <cstdio>
 void analyze_trace(pcap_t* handle)
 {
 	pcap_pkthdr* hdr;
@@ -65,18 +65,30 @@ void analyze_trace(pcap_t* handle)
 
 		// Find TCP payload length
 		uint16_t data_len = ntohs(*((uint16_t*) (pkt + ETHERNET_FRAME_SIZE + 2))) - tcp_off - data_off; // Ethernet frame size - total size of headers
-
+		
 		// Create connection if SYN flag is set
 		if ((*((uint8_t*) (pkt + ETHERNET_FRAME_SIZE + tcp_off + 13)) &0x02))
 		{
 			data = &flow::create_connection(src_addr, src_port, dst_addr, dst_port, seq_no, hdr->ts);
 		}
 
-		// Locate connection data and update it
-		data = flow::find_connection(src_addr, src_port, dst_addr, dst_port);
-		data->register_sent(seq_no, seq_no + data_len, hdr->ts);
+		// Locate connection data and update segment count
+		else if ((data = flow::find_connection(src_addr, src_port, dst_addr, dst_port)) == NULL)
+		{
+			// Didn't catch SYN for this connection, is trace missing packets?
+			data = &flow::create_connection(src_addr, src_port, dst_addr, dst_port, seq_no, hdr->ts);
+		}
 
-		data = flow::find_connection(dst_addr, dst_port, src_addr, src_port);
+		if (data_len > 0)
+		{
+			data->register_sent(seq_no, seq_no + data_len, hdr->ts);
+		}
+
+		// Locate reverse connection and update ACK count
+		if ((data = flow::find_connection(dst_addr, dst_port, src_addr, src_port)) == NULL)
+		{
+			data = &flow::create_connection(dst_addr, dst_port, src_addr, src_port, seq_no, hdr->ts);
+		}
 		data->register_ack(ack_no, hdr->ts);
 	}
 }
