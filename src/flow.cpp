@@ -9,9 +9,8 @@
 using std::vector;
 
 
-
-/* A map over all connections */
-static flow::flow_map connections;
+/* A map of all connections */
+flow::flow_map flow::connections;
 
 
 
@@ -61,7 +60,7 @@ flow& flow::operator=(const flow& rhs)
 
 
 
-bool flow::create_connection(uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport, uint32_t seqno, const timeval& ts)
+flowdata& flow::create_connection(uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport, uint32_t seqno, const timeval& ts)
 {
 	flow key(src, dst, sport, dport);
 
@@ -71,13 +70,12 @@ bool flow::create_connection(uint32_t src, uint16_t sport, uint32_t dst, uint16_
 	if (lower_bound != connections.end() && !(connections.key_comp()(key, lower_bound->first)))
 	{
 		// Flow was found
-		// Assume that it's data has already been set
-		return false;
+		// Assume that its data has already been set
+		return lower_bound->second;
 	}
 
 	// Flow was not found, we have to create it
-	connections.insert(lower_bound, flow_map::value_type(key, flowdata(seqno, ts)));
-	return true;
+	return connections.insert(lower_bound, flow_map::value_type(key, flowdata(seqno, ts)))->second;
 }
 
 

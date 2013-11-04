@@ -1,29 +1,40 @@
 #include "trace.h"
 #include "flow.h"
+#include <exception>
 #include <pcap.h>
 #include <tr1/cstdint>
 #include <arpa/inet.h>
+#include <assert.h>
+
+
+
+std::string filter::str() const
+{
+	std::string str("tcp");
+
+	return str;
+}
 
 
 
 void set_filter(pcap_t* handle, const filter& filter)
 {
+	using std::exception;
+
 	bpf_program prog_code;
 
-	// TODO
-	if (pcap_compile(handle, &prog_code, "", 0, PCAP_NETMASK_UNKNOWN) == -1)
+	if (pcap_compile(handle, &prog_code, filter.str().c_str(), 0, PCAP_NETMASK_UNKNOWN) == -1)
 	{
-		//return -1;
+		throw exception();
 	}
 
 	if (pcap_setfilter(handle, &prog_code) == -1)
 	{
 		pcap_freecode(&prog_code);
-		//return -2;
+		throw exception();
 	}
 
 	pcap_freecode(&prog_code);
-	//return 0;
 }
 
 
@@ -32,7 +43,9 @@ void analyze_trace(pcap_t* handle)
 {
 	pcap_pkthdr* hdr;
 	const u_char* pkt;
-	flowdata* data;
+	flowdata* data = NULL;
+
+	// TODO: Do an extra call to pcap_next_ex and find the first timestamp
 
 	while (pcap_next_ex(handle, &hdr, &pkt) == 1)
 	{
@@ -53,8 +66,11 @@ void analyze_trace(pcap_t* handle)
 		// Find TCP payload length
 		uint16_t data_len = ntohs(*((uint16_t*) (pkt + ETHERNET_FRAME_SIZE + 2))) - tcp_off - data_off; // Ethernet frame size - total size of headers
 
-		// TODO: Check flags, if SYN or FIN don't call register sent
-		// TODO: Check flags, if SYN create connection
+		// Create connection if SYN flag is set
+		if ((*((uint8_t*) (pkt + ETHERNET_FRAME_SIZE + tcp_off + 13)) &0x02))
+		{
+			data = &flow::create_connection(src_addr, src_port, dst_addr, dst_port, seq_no, hdr->ts);
+		}
 
 		// Locate connection data and update it
 		data = flow::find_connection(src_addr, src_port, dst_addr, dst_port);

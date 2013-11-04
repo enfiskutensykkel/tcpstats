@@ -20,7 +20,7 @@ class flow
 {
 	public:
 		/* Create a connection */
-		static bool create_connection(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port, uint32_t first_seqno, const timeval& first_timestamp);
+		static flowdata& create_connection(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port, uint32_t first_seqno, const timeval& first_timestamp);
 
 		/* Retrieve flow data */
 		static flowdata* find_connection(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port);
@@ -59,9 +59,9 @@ class flow
 		uint16_t sport;			// source port
 		uint16_t dport;			// destination port
 
-	public:
-		/* Connection to flow data map type */
+		/* Connection to flowdata map  */
 		typedef std::map< flow, flowdata > flow_map;
+		static flow_map connections;
 };
 
 
@@ -88,7 +88,6 @@ class flowdata
 		};
 
 		flowdata& operator=(const flowdata& other);
-
 
 	private:
 		/* Flow properties */
