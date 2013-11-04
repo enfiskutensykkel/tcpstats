@@ -1,5 +1,4 @@
-calcloss
+tcpstats
 ========
 
-Calculate loss over time by looking at ACKed ranges.
-Group by TCP flow.
+Calculate various statistics for different TCP flows in a trace file.
