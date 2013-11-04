@@ -133,6 +133,20 @@ void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 
 
 
+uint32_t flowdata::total_retransmissions() const
+{
+	uint32_t retr = 0;
+
+	for (range_map::const_iterator it = ranges.begin(); it != ranges.end(); it++)
+	{
+		retr += it->second.sent.size() - 1;
+	}
+
+	return retr;
+}
+
+
+
 flowdata::flowdata(uint32_t first_seqno, const timeval& first_ts)
 	: first_seqno(first_seqno), highest_ackd(first_seqno), rtt(-1)
 	, first_ts(first_ts), last_ts(first_ts)

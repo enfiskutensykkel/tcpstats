@@ -27,8 +27,13 @@ int main(int argc, char** argv)
 	vector<const flow*> connections;
 	vector<const flowdata*> data;
 	
-	int count = flow::list_connections(connections, data);
+	unsigned count = flow::list_connections(connections, data);
 	printf("Connections found: %d\n", count);
+
+	for (unsigned i = 0; i < count; ++i)
+	{
+		printf("%s has %u retransmissions\n", connections[i]->id().c_str(), data[i]->total_retransmissions());
+	}
 
 	pcap_close(handle);
 

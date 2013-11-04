@@ -62,7 +62,7 @@ flow& flow::operator=(const flow& rhs)
 
 bool flow::find_connection(const flow*& conn, flowdata*& data, uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport, uint32_t seqno, const timeval& ts)
 {
-	flow key(src, dst, sport, dport);
+	flow key(src, sport, dst, dport);
 
 	// Try to find flow in the connection map
 	flow_map::iterator f = connections.lower_bound(key);
@@ -84,14 +84,14 @@ bool flow::find_connection(const flow*& conn, flowdata*& data, uint32_t src, uin
 
 
 
-int flow::list_connections(vector<const flow*>& conns, vector<const flowdata*>& fdata)
+uint32_t flow::list_connections(vector<const flow*>& conns, vector<const flowdata*>& fdata)
 {
-	int flows = 0;
+	uint32_t flows = 0;
 
 	for (flow_map::iterator it = connections.begin(); it != connections.end(); it++)
 	{
-		fdata.push_back(&(it->second));
-		conns.push_back(&(it->first));
+		fdata.push_back(&it->second);
+		conns.push_back(&it->first);
 		++flows;
 	}
 

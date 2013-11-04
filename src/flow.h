@@ -23,7 +23,7 @@ class flow
 		static bool find_connection(const flow*& flow, flowdata*& data, uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port, uint32_t seqno, const timeval& timestamp);
 
 		/* Get a list of all existing connections */
-		static int list_connections(std::vector<const flow*>& connections, std::vector<const flowdata*>& data);
+		static uint32_t list_connections(std::vector<const flow*>& connections, std::vector<const flowdata*>& data);
 
 		/* 
 		 * Human readable string identifying the flow.
@@ -75,6 +75,8 @@ class flowdata
 
 		/* Register an acknowledgement (ACK) */
 		void register_ack(uint32_t ackno, const timeval& timestamp);
+
+		uint32_t total_retransmissions() const;
 
 		/* Ctors, operators and const-correctness stuff */
 		flowdata(uint32_t first_segment_seqno, const timeval& first_segment_timestamp);
