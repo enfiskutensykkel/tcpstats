@@ -173,7 +173,7 @@ inline void flowdata::find_and_split_ranges(range_list& list, const range& key, 
  */
 void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 {
-	if (ranges.empty())
+	if (rel_seqno_max == -1)
 	{
 		abs_seqno_first = start;
 		abs_seqno_max = end;
@@ -231,13 +231,39 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
  */
 void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 {
-	// We assume that only segments with ACK flag set is registered
-	// This assumption holds as long as the trace isn't missing any packets
-	//uint64_t rel_ackno = relative
-	//assert(!ranges.empty() || (highest_ackd == first_seqno - 1)); 
+	uint64_t rel_ackno = relative_seqno(ackno);
 
-	if (ackno < highest_ackd)
+	// We assume that only TCP segments with ACK flag set is filtered in the trace
+	// We also assume that register_sent is called before register_ack
+	assert(rel_seqno_max != -1);
+	//assert(rel_ackno <= rel_seqno_max);
+
+	range_list list;
+
+	if (rel_ackno < highest_ackd)
 	{
+		// Old acknowledgement
+		range key(rel_ackno, highest_ackd);
+		find_and_split_ranges(list, key, true);
+	}
+	else if (rel_ackno > highest_ackd)
+	{
+		// New acknowledgement
+		range key(highest_ackd, rel_ackno);
+		find_and_split_ranges(list, key, true);
+
+		highest_ackd = rel_ackno;
+	}
+	else
+	{
+		// Possible duplicate acknowledgement
+		range key(highest_ackd, highest_ackd+1);
+		find_ranges(list, key);
+	}
+
+	for (range_list::iterator it = list.begin(); it != list.end(); ++it)
+	{
+		(*it)->ackd.push_back(ts);
 	}
 }
 
@@ -257,9 +283,20 @@ uint32_t flowdata::total_retransmissions() const
 
 
 
+flowdata::flowdata()
+	: abs_seqno_first(0), abs_seqno_max(0), rel_seqno_max(-1)
+	, highest_ackd(-1), rtt_min(-1)
+{
+	ts_first.tv_sec = ts_first.tv_usec = 0;
+	ts_last.tv_sec = ts_last.tv_usec = 0;
+}
+
+
+
 flowdata& flowdata::operator=(const flowdata& rhs)
 {
-	// FIXME: Only copy the members that needs to be copied, we should avoid deep-copies anyway
+	// FIXME: Only copy the members that needs to be copied
+	// we should avoid deep-copies anyway
 	abs_seqno_first = rhs.abs_seqno_first;
 	abs_seqno_max = rhs.abs_seqno_max;
 	rel_seqno_max = rhs.rel_seqno_max;

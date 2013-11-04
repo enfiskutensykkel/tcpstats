@@ -79,9 +79,7 @@ class flowdata
 		uint32_t total_retransmissions() const;
 
 		/* Ctors, operators and const-correctness stuff */
-		flowdata() 
-		{
-		};
+		flowdata();
 
 		flowdata(const flowdata& other)
 		{

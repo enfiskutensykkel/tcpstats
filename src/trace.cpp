@@ -38,7 +38,7 @@ void set_filter(pcap_t* handle, const filter& filter)
 }
 
 
-
+#include <cstdio>
 void analyze_trace(pcap_t* handle)
 {
 	pcap_pkthdr* hdr;
