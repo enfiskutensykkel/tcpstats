@@ -6,7 +6,7 @@
 #include <string>
 
 
-class filter;
+struct filter;
 
 
 
