@@ -6,8 +6,29 @@
 #include <tr1/cstdint>
 
 
-// Forward declaration of stream
-class stream;
+/* Forward declaration of flowdata */
+class flowdata;
+
+
+
+/*
+ * A range object represents a byte range (typically payload of a TCP segment).
+ */
+class range
+{
+	friend class flowdata;
+
+	private:
+		uint64_t seqno_lo;	// the lower sequence number in the range (range start)
+		uint64_t seqno_hi;	// the upper sequence number in the range (range end)
+
+	public:
+		range(uint64_t seqno_start, uint64_t seqno_end);
+		range(const range& other);
+		range& operator=(const range& rhs);
+		bool operator<(const range& rhs);
+		bool operator<(const range& rhs) const;
+};
 
 
 
@@ -16,7 +37,7 @@ class stream;
  */
 class rangedata
 {
-	friend class stream;
+	friend class flowdata;
 
 	public:
 	
@@ -42,33 +63,9 @@ class rangedata
 
 		rangedata& operator=(const rangedata& other);
 
-		//DEBUG
-	//private: 
+	private: 
 		std::vector<timeval> sent;	// the timestamps this range was registered as sent
 		std::vector<timeval> ackd;	// the timestamps this range was acknowledged
-};
-
-
-
-/*
- * A range represents a byte range (typically a TCP segment).
- */
-class range
-{
-	friend class rangedata;
-	friend class stream;
-
-	//private:
-	public: // DEBUG
-		uint64_t seqno_lo;	// the lower sequence number in the range (range start)
-		uint64_t seqno_hi;	// the upper sequence number in the range (range end)
-
-	public:
-		range(uint64_t seqno_start, uint64_t seqno_end);
-		range(const range& other);
-		range& operator=(const range& rhs);
-		bool operator<(const range& rhs);
-		bool operator<(const range& rhs) const;
 };
 
 #endif
