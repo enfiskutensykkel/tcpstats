@@ -8,7 +8,10 @@
 
 
 
-void flowdata::get_ranges(range_list& list, range& key, bool include)
+/*
+ * Helper method to retrieve and split matching ranges.
+ */
+void flowdata::find_and_split_ranges(range_list& list, range& key, bool include_new_ranges)
 {
 	range_map::iterator curr, next, last, lo, hi, ins;
 
@@ -17,6 +20,7 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 
 	if (lo == hi)
 	{
+		// A completely new range with no matching data
 		return;
 	}
 
@@ -26,7 +30,8 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 	if (key.seqno_lo < lo->first.seqno_lo)
 	{
 		ins = ranges.insert(lo, range_map::value_type(range(key.seqno_lo, lo->first.seqno_lo), lo->second));
-		if (include)
+
+		if (include_new_ranges)
 			list.push_back(&ins->second);
 	}
 
@@ -34,7 +39,8 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 	if (key.seqno_hi > hi->first.seqno_hi)
 	{
 		last = ranges.insert(hi, range_map::value_type(range(hi->first.seqno_hi, key.seqno_hi), hi->second));
-		if (include)
+
+		if (include_new_ranges)
 			list.push_back(&last->second);
 	}
 
@@ -47,6 +53,8 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 
 		if (key.seqno_lo <= rrange.seqno_lo && key.seqno_hi >= rrange.seqno_hi)
 		{
+
+			// The new range overlaps this chunk completely
 			// Existing range:  |-----|
 			// New range:       <-----> 
 			ins = curr;
@@ -54,6 +62,7 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 
 		else if (key.seqno_lo > rrange.seqno_lo && key.seqno_hi < rrange.seqno_hi)
 		{
+			// The new range overlaps only part of this chunks, split into three chunks
 			// Existing range: |-----|
 			// New range:        |-| 
 			ranges.insert(curr, range_map::value_type(range(rrange.seqno_lo, key.seqno_lo), data));
@@ -64,6 +73,7 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 
 		else if (key.seqno_lo > rrange.seqno_lo)
 		{
+			// The new range overlaps the latter part of this chunk, split into two chunks
 			// Existing range: |-----|
 			// New range:        |---|
 			ranges.insert(curr, range_map::value_type(range(rrange.seqno_lo, key.seqno_lo), data));
@@ -73,6 +83,7 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 
 		else if (key.seqno_hi < rrange.seqno_hi)
 		{
+			// The new range overlaps the former part of this chunk, split into two chunks
 			// Existing range: |-----|
 			// New range:      |---|
 			ins = ranges.insert(curr, range_map::value_type(range(rrange.seqno_lo, key.seqno_hi), data));
@@ -94,6 +105,9 @@ void flowdata::get_ranges(range_list& list, range& key, bool include)
 
 
 
+/*
+ * Increase sent count on a byte range.
+ */
 void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 {
 	// TODO: update last_segment if ts > last_segment
@@ -107,7 +121,7 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 	// Find byte ranges that has matches
 	range key(adjust(start), adjust(end));
 	range_list ranges;
-	get_ranges(ranges, key, false);
+	find_and_split_ranges(ranges, key, false);
 
 
 	if (ranges.empty())
@@ -127,6 +141,9 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 
 
 
+/*
+ * Mark a byte range as acknowledged.
+ */
 void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 {
 }

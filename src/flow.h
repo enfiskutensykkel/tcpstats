@@ -96,16 +96,16 @@ class flowdata
 		timeval first_ts,		// flow duration (first registered segment, and last registered segment)
 				last_ts;
 
-		/* A map over byte ranges */
+		/* A map over byte ranges and data about them */
 		typedef std::multimap< range, rangedata > range_map;
 		range_map ranges;
 
 		/* Helper macro to adjust for sequence number wrapping */
-#define adjust(seqno) ( (uint64_t) (seqno) - (this->first_seqno) )
+		#define adjust(seqno) ( (uint64_t) (seqno) - (this->first_seqno) )
 
 		/* Helper method to match and split ranges */
 		typedef std::list< rangedata* > range_list;
-		inline void get_ranges(range_list& list, range& key, bool include_new);
+		inline void find_and_split_ranges(range_list& list, range& key, bool include_new_data);
 
 		/* Data aggregated over intervals/time slices */
 		std::vector<uint64_t> throughput;
