@@ -20,7 +20,7 @@ class flow
 {
 	public:
 		/* Retrieve a connection or create it if it doesn't exist */
-		static bool find_connection(const flow*& flow, flowdata*& data, uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port, uint32_t seqno, const timeval& timestamp);
+		static bool find_connection(const flow*& flow, flowdata*& data, uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port);
 
 		/* Get a list of all existing connections */
 		static uint32_t list_connections(std::vector<const flow*>& connections, std::vector<const flowdata*>& data);
@@ -79,7 +79,9 @@ class flowdata
 		uint32_t total_retransmissions() const;
 
 		/* Ctors, operators and const-correctness stuff */
-		flowdata(uint32_t first_segment_seqno, const timeval& first_segment_timestamp);
+		flowdata() 
+		{
+		};
 
 		flowdata(const flowdata& other)
 		{
@@ -90,22 +92,26 @@ class flowdata
 
 	private:
 		/* Flow properties */
-		uint32_t first_seqno;	// first sequence number (used to handle sequence number wrapping)
-		uint64_t highest_ackd;	// the highest acknowledgement number received
-		uint64_t rtt;			// the lowest registered delay (which we assume to be the RTT)
-		timeval first_ts,		// flow duration (first registered segment, and last registered segment)
-				last_ts;
+		uint32_t abs_seqno_first;	// first absolute sequence number (used to handle sequence number wrapping)
+		uint32_t abs_seqno_max;  	// highest absolute sequence number registered (used to handle seqno wrapping)
+		uint64_t rel_seqno_max;  	// highest relative sequence number registered (used to handle seqno wrapping)
+
+		/* Helper method to handle sequence number wrapping */
+		inline uint64_t relative_seqno(uint32_t absolute_sequence_number);
+
+		uint64_t highest_ackd;	// the highest relative acknowledgement number received
+		uint64_t rtt_min;		// the lowest registered delay (which we assume to be the RTT)
+		timeval ts_first,		// flow duration (first registered segment, and last registered segment)
+				ts_last;
 
 		/* A map over byte ranges and data about them */
 		typedef std::multimap< range, rangedata > range_map;
 		range_map ranges;
 
-		/* Helper macro to adjust for sequence number wrapping */
-		#define adjust(seqno) ( (uint64_t) (seqno) - (this->first_seqno) )
-
-		/* Helper method to match and split ranges */
+		/* Helper methods to match and split ranges */
 		typedef std::list< rangedata* > range_list;
-		inline void find_and_split_ranges(range_list& list, range& key, bool include_new_data);
+		inline void find_ranges(range_list& list, const range& key);
+		inline void find_and_split_ranges(range_list& list, const range& key, bool include_new_data);
 
 		/* Data aggregated over intervals/time slices */
 		std::vector<uint64_t> throughput;

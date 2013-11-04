@@ -2,16 +2,79 @@
 #include "range.h"
 #include <map>
 #include <vector>
+#include <algorithm>
 #include <tr1/cstdint>
 #include <sys/time.h>
 #include <assert.h>
+
+#include <cstdio>
+
+/* Helper macros to check if X comes before Y */
+#define sequential(x, y)  ((int32_t) ((x) - (y)) < 0)
+#define isequential(x, y) ((int32_t) ((y) - (x)) >= 0)
+
+
+/* Helper function to handle sequence number wrapping */
+inline uint64_t flowdata::relative_seqno(uint32_t abs_current)
+{
+	uint64_t wrapped = abs_seqno_first + rel_seqno_max;
+
+	if (abs_current < abs_seqno_max)
+	{
+		if (sequential(abs_current, abs_seqno_max))
+		{
+			// Retransmission of earlier sequence number
+			wrapped -= (abs_seqno_max - abs_current);
+		}
+		else
+		{
+			// Sequence number has wrapped
+			wrapped += (0 - abs_seqno_max) + abs_current;
+		}
+
+	}
+	else
+	{
+		if (isequential(abs_seqno_max, abs_current))
+		{
+			// New sequence number
+			wrapped += (abs_current - abs_seqno_max);
+		}
+		else
+		{
+			// Sequence number is older than abs_max, abs_max has wrapped
+			wrapped -= (0 - abs_current) - abs_seqno_max;
+		}
+	}
+
+	// Return relative sequence number
+	return abs_current + ((wrapped / UINT32_MAX) * UINT32_MAX) - abs_seqno_first;
+}
+
+
+
+/*
+ * Helper method to retrieve range matches.
+ */
+inline void flowdata::find_ranges(range_list& list, const range& key)
+{
+	range_map::iterator lo, hi, it;
+
+	lo = ranges.lower_bound(key);
+	hi = ranges.upper_bound(key);
+
+	for (it = lo; it != hi; it++)
+	{
+		list.push_back(&it->second);
+	}
+}
 
 
 
 /*
  * Helper method to retrieve and split matching ranges.
  */
-void flowdata::find_and_split_ranges(range_list& list, range& key, bool include_new_ranges)
+inline void flowdata::find_and_split_ranges(range_list& list, const range& key, bool include_new_ranges)
 {
 	range_map::iterator curr, next, last, lo, hi, ins;
 
@@ -110,8 +173,30 @@ void flowdata::find_and_split_ranges(range_list& list, range& key, bool include_
  */
 void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 {
-	// TODO: update last_segment if ts > last_segment
-	
+	if (ranges.empty())
+	{
+		abs_seqno_first = start;
+		abs_seqno_max = end;
+		rel_seqno_max = 0;
+
+		highest_ackd = rel_seqno_max;
+		rtt_min = -1;
+
+		ts_first = ts;
+		ts_last = ts;
+	}
+
+	// Calculate and update relative sequence numbers
+	uint64_t rel_start, rel_end;
+	rel_start = relative_seqno(start);
+	rel_end = relative_seqno(end);
+
+	if (rel_end > rel_seqno_max)
+	{
+		rel_seqno_max = rel_end;
+		abs_seqno_max = end;
+	}
+
 	// Check if there actually is any data to update
 	if ((end - start) == 0)
 	{
@@ -119,22 +204,22 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 	}
 
 	// Find byte ranges that has matches
-	range key(adjust(start), adjust(end));
-	range_list ranges;
-	find_and_split_ranges(ranges, key, false);
+	range key(rel_start, rel_end);
+	range_list list;
+	find_and_split_ranges(list, key, false);
 
 
-	if (ranges.empty())
+	if (list.empty())
 	{
 		// We have a completely new range
-		this->ranges.insert(std::pair<range,rangedata>(key, ts));
+		ranges.insert(std::pair<range,rangedata>(key, ts));
 	}
 	else
 	{
 		// Update existing ranges' transmission count
-		for (range_list::iterator i = ranges.begin(); i != ranges.end(); ++i)
+		for (range_list::iterator it = list.begin(); it != list.end(); ++it)
 		{
-			(*i)->sent.push_back(ts);
+			(*it)->sent.push_back(ts);
 		}
 	}
 }
@@ -146,6 +231,14 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
  */
 void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 {
+	// We assume that only segments with ACK flag set is registered
+	// This assumption holds as long as the trace isn't missing any packets
+	//uint64_t rel_ackno = relative
+	//assert(!ranges.empty() || (highest_ackd == first_seqno - 1)); 
+
+	if (ackno < highest_ackd)
+	{
+	}
 }
 
 
@@ -164,22 +257,18 @@ uint32_t flowdata::total_retransmissions() const
 
 
 
-flowdata::flowdata(uint32_t first_seqno, const timeval& first_ts)
-	: first_seqno(first_seqno), highest_ackd(first_seqno), rtt(-1)
-	, first_ts(first_ts), last_ts(first_ts)
-{
-}
-
-
-
 flowdata& flowdata::operator=(const flowdata& rhs)
 {
-	first_seqno = rhs.first_seqno;
-	highest_ackd = rhs.highest_ackd;
-	rtt = rhs.rtt;
-	first_ts = rhs.first_ts;
-	last_ts = rhs.last_ts;
+	// FIXME: Only copy the members that needs to be copied, we should avoid deep-copies anyway
+	abs_seqno_first = rhs.abs_seqno_first;
+	abs_seqno_max = rhs.abs_seqno_max;
+	rel_seqno_max = rhs.rel_seqno_max;
 
-	// TODO: Only copy the members that needs to be copied, we should avoid deep-copies anyway
+	rtt_min = rhs.rtt_min;
+	highest_ackd = rhs.highest_ackd;
+
+	ts_first = rhs.ts_first;
+	ts_last = rhs.ts_last;
+
 	return *this;
 }

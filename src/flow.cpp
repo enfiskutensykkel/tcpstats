@@ -60,7 +60,7 @@ flow& flow::operator=(const flow& rhs)
 
 
 
-bool flow::find_connection(const flow*& conn, flowdata*& data, uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport, uint32_t seqno, const timeval& ts)
+bool flow::find_connection(const flow*& conn, flowdata*& data, uint32_t src, uint16_t sport, uint32_t dst, uint16_t dport)
 {
 	flow key(src, sport, dst, dport);
 
@@ -76,7 +76,7 @@ bool flow::find_connection(const flow*& conn, flowdata*& data, uint32_t src, uin
 	}
 
 	// Flow was not found, we have to create it
-	f = connections.insert(f, flow_map::value_type(key, flowdata(seqno, ts)));
+	f = connections.insert(f, flow_map::value_type(key, flowdata()));
 	conn = &f->first;
 	data = &f->second;
 	return true;
