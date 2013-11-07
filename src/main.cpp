@@ -37,7 +37,7 @@ int main(int argc, char** argv)
 
 	for (unsigned i = 0; i < count; ++i)
 	{
-		printf("%s has %u retransmissions and %u dupacks\n", connections[i]->id().c_str(), data[i]->total_retransmissions(), data[i]->total_dupacks());
+		printf("%s has %u (%u) retransmissions and %u dupacks (%lu)\n", connections[i]->id().c_str(), data[i]->total_retrans(), data[i]->max_num_retrans(), data[i]->total_dupacks(), data[i]->unique_bytes_sent());
 	}
 
 	return 0;

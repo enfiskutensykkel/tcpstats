@@ -76,8 +76,11 @@ class flowdata
 		/* Register an acknowledgement (ACK) */
 		void register_ack(uint32_t ackno, const timeval& timestamp);
 
-		uint32_t total_retransmissions() const;
+		/* Various statistics of raw data */
+		uint32_t total_retrans() const;
+		uint32_t max_num_retrans() const;
 		uint32_t total_dupacks() const;
+		uint64_t unique_bytes_sent() const;
 
 		/* Ctors, operators and const-correctness stuff */
 		flowdata();
