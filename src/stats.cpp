@@ -42,7 +42,8 @@ uint32_t flowdata::total_dupacks() const
 
 	for (range_map::const_iterator it = ranges.begin(); it != ranges.end(); it++)
 	{
-		dupacks += it->second.ackd.size() - 1;
+		uint32_t size = it->second.ackd.size();
+		dupacks += size > 1 ? size - 1 : 0;
 	}
 
 	return dupacks;
@@ -60,4 +61,18 @@ uint64_t flowdata::unique_bytes_sent() const
 	}
 
 	return byte_count;
+}
+
+
+
+uint64_t flowdata::rtt() const
+{
+	return rtt_min;
+}
+
+
+
+uint64_t flowdata::duration() const
+{
+	return USECS(ts_last) - USECS(ts_first);
 }

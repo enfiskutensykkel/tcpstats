@@ -23,11 +23,36 @@ class range
 		uint64_t seqno_hi;	// the upper sequence number in the range (range end)
 
 	public:
-		range(uint64_t seqno_start, uint64_t seqno_end);
-		range(const range& other);
-		range& operator=(const range& rhs);
-		bool operator<(const range& rhs);
-		bool operator<(const range& rhs) const;
+		inline range(uint64_t seqno_start, uint64_t seqno_end)
+			: seqno_lo(seqno_start), seqno_hi(seqno_end)
+		{
+		};
+
+		inline range(const range& rhs)
+		{
+			*this = rhs;
+		};
+
+		inline range& operator=(const range& rhs)
+		{
+			seqno_lo = rhs.seqno_lo;
+			seqno_hi = rhs.seqno_hi;
+			return *this;
+		};
+
+		inline bool operator<(const range& rhs)
+		{
+			if (seqno_hi <= rhs.seqno_lo)
+				return true;
+			if (seqno_lo >= rhs.seqno_hi)
+				return false;
+			return false;
+		};
+
+		inline bool operator<(const range& rhs) const
+		{
+			return const_cast<range*>(this)->operator<(rhs);
+		};
 };
 
 
@@ -44,24 +69,23 @@ class rangedata
 		/* The elapsed time between when the range first was sent until it got ACK'ed */
 		timeval latency();
 
-		/* Number of times the range was retransmitted */
-		int retransmissions();
-
-		/* Number of times the range was lost */
-		int lost();
-
-		/* Number of times the range was ACK'ed (more than 1 means that we got dupACKs for this range) */
-		int ack_count();
-
 		/* Constructors and overloads for comparison operators */
-		rangedata(const timeval& timestamp);
+		inline rangedata(const timeval& timestamp)
+		{
+			sent.push_back(timestamp);
+		};
 
 		inline rangedata(const rangedata& other)
 		{
 			*this = other;
 		};
 
-		rangedata& operator=(const rangedata& other);
+		inline rangedata& operator=(const rangedata& rhs)
+		{
+			sent = rhs.sent;
+			ackd = rhs.ackd;
+			return *this;
+		};
 
 	private: 
 		std::vector<timeval> sent;	// the timestamps this range was registered as sent

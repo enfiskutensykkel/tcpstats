@@ -158,14 +158,17 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 {
 	if (rel_seqno_max == UINT64_MAX)
 	{
-		abs_seqno_min = abs_seqno_max = start;
+		abs_seqno_min = abs_seqno_max = end;
 		rel_seqno_max = 0;
 
-		//ts_first = ts;
-		//ts_last = ts;
+		ts_first = ts;
+		ts_last = ts;
 	}
 
-	// TODO: Update ts_last
+	if (USECS(ts) > USECS(ts_last))
+	{
+		ts_last = ts;
+	}
 
 	// Calculate and update relative sequence numbers
 	uint64_t rel_start, rel_end;
@@ -174,8 +177,8 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 
 	if (rel_end > rel_seqno_max)
 	{
-		rel_seqno_max = rel_start;
-		abs_seqno_max = start;
+		rel_seqno_max = rel_end;
+		abs_seqno_max = end;
 	}
 
 	// Check if there actually is any data to update
@@ -229,15 +232,18 @@ void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 
 	if (rel_ackno <= prev_ack)
 	{
+		// This shouldn't happen
 		assert(false);
 	}
-	else if (rel_ackno == curr_ack)
+	else if (rel_ackno <= curr_ack)
 	{
-		range key(prev_ack, curr_ack);
+		// We got a duplicate ACK
+		range key(prev_ack, rel_ackno);
 		find_and_split_ranges(list, key, true);
 	}
 	else if (rel_ackno > curr_ack)
 	{
+		// We got a new ACK
 		range key(curr_ack, rel_ackno);
 		find_and_split_ranges(list, key, true);
 
@@ -245,14 +251,15 @@ void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 		prev_ack = curr_ack;
 		curr_ack = rel_ackno;
 	}
-	else if (rel_ackno < curr_ack)
-	{
-		range key(prev_ack, rel_ackno);
-		find_and_split_ranges(list, key, true);
-	}
 
+	// Update acknowledgement times for all the matching ranges
 	for (range_list::iterator it = list.begin(); it != list.end(); ++it)
 	{
+		if ((USECS(ts) - USECS((*it)->sent.back())) < rtt_min)
+		{
+			rtt_min = (USECS(ts) - USECS((*it)->sent.back()));
+		}
+
 		(*it)->ackd.push_back(ts);
 	}
 }

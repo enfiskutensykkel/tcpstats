@@ -9,6 +9,14 @@
 #include <list>
 #include "range.h"
 
+
+/*
+ * Macro to convert a struct timeval into a number of microseconds
+ */
+#define USECS(tv) (((uint64_t) tv.tv_sec) * 1000000 + ((uint64_t) tv.tv_usec))
+
+
+
 class flowdata;
 
 
@@ -30,7 +38,7 @@ class flow
 		 * Example output: 10.0.0.1:8888=>10.0.0.2:9999
 		 */
 		std::string id();
-		std::string id() const 
+		inline std::string id() const 
 		{ 
 			return const_cast<flow*>(this)->id(); 
 		};
@@ -38,7 +46,7 @@ class flow
 		/* Ctors, operators and const-correctness stuff */
 		flow& operator=(const flow& other);
 		flow(uint32_t src_addr, uint16_t src_port, uint32_t dst_addr, uint16_t dst_port);
-		flow(const flow& other) 
+		inline flow(const flow& other) 
 		{ 
 			*this = other; 
 		};
@@ -81,11 +89,13 @@ class flowdata
 		uint32_t max_num_retrans() const;
 		uint32_t total_dupacks() const;
 		uint64_t unique_bytes_sent() const;
+		uint64_t rtt() const;
+		uint64_t duration() const;
 
 		/* Ctors, operators and const-correctness stuff */
 		flowdata();
 
-		flowdata(const flowdata& other)
+		inline flowdata(const flowdata& other)
 		{
 			*this = other;
 		};
