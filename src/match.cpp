@@ -12,45 +12,45 @@
 #define i_sequential(x, y) ((int32_t) ((y) - (x)) >= 0)
 
 
-
-/* Helper function to handle sequence number wrapping */
-inline uint64_t flowdata::relative_seqno(uint32_t seqno)
+/* 
+ * Helper function to handle sequence number wrapping 
+ */
+static inline uint64_t relative(uint32_t seqno, uint32_t first, uint32_t last, uint64_t current)
 {
-	uint64_t wrapped = abs_seqno_min + rel_seqno_max;
+	uint64_t wrapped = first + current;
 
-	if (seqno < abs_seqno_max)
+	if (seqno < last)
 	{
-		if (sequential(seqno, abs_seqno_max))
+		if (sequential(seqno, last))
 		{
-			// Retransmission of earlier sequence number
-			wrapped -= (abs_seqno_max - seqno);
+			// Earlier sequence number
+			wrapped -= (last - seqno);
 		}
 		else
 		{
 			// Sequence number has wrapped
-			wrapped += (0 - abs_seqno_max) + seqno;
+			wrapped += (0 - last) + seqno;
 		}
-
 	}
 	else
 	{
-		if (i_sequential(abs_seqno_max, seqno))
+		if (i_sequential(last, seqno))
 		{
 			// New sequence number
-			wrapped += (seqno - abs_seqno_max);
-			// TODO: Update highest seqno here?
+			wrapped += (seqno - last);
 		}
 		else
 		{
-			// Sequence number is older than abs_max, abs_max has wrapped
-			wrapped -= (0 - seqno) - abs_seqno_max;
+			// Sequence number is older than last, last has wrapped
+			wrapped -= (0 - seqno) - last;
 		}
 	}
 
-	// Return relative sequence number
-	uint64_t rel_seqno = seqno + ((wrapped / (((uint64_t) UINT32_MAX) + 1)) * (((uint64_t) UINT32_MAX) + 1)) - abs_seqno_min;
-	return rel_seqno;
+	// Return the relative sequence number
+	return seqno + ((wrapped / (((uint64_t) UINT32_MAX) + 1)) * (((uint64_t) UINT32_MAX) + 1)) - first;
 }
+
+
 
 
 
@@ -158,22 +158,19 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 {
 	if (rel_seqno_max == UINT64_MAX)
 	{
-		abs_seqno_min = start;
-		abs_seqno_max = start;
+		abs_seqno_min = abs_seqno_max = start;
 		rel_seqno_max = 0;
 
-		curr_ack = rel_seqno_max;
-		prev_ack = rel_seqno_max;
-		rtt_min = -1;
-
-		ts_first = ts;
-		ts_last = ts;
+		//ts_first = ts;
+		//ts_last = ts;
 	}
+
+	// TODO: Update ts_last
 
 	// Calculate and update relative sequence numbers
 	uint64_t rel_start, rel_end;
-	rel_start = relative_seqno(start);
-	rel_end = relative_seqno(end);
+	rel_start = relative(start, abs_seqno_min, abs_seqno_max, rel_seqno_max);
+	rel_end = relative(end, abs_seqno_min, abs_seqno_max, rel_seqno_max);
 
 	if (rel_end > rel_seqno_max)
 	{
@@ -215,11 +212,13 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
  */
 void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 {
-	// TODO: We should make a relative_ackno function in case sequence numbers wrap more than once
-	uint64_t rel_ackno = relative_seqno(ackno);
+	if (curr_ack == UINT64_MAX)
+	{
+		abs_ackno_min = abs_ackno_max = ackno;
+		curr_ack = prev_ack = 0;
+	}
 
-	assert(rel_seqno_max != UINT64_MAX);
-	//assert(rel_ackno <= rel_seqno_max); // TODO
+	uint64_t rel_ackno = relative(ackno, abs_ackno_min, abs_ackno_max, curr_ack);
 
 	if (rel_ackno == 0 || (ackno - abs_seqno_min) == 1)
 	{
@@ -242,6 +241,7 @@ void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 		range key(curr_ack, rel_ackno);
 		find_and_split_ranges(list, key, true);
 
+		abs_ackno_max = ackno;
 		prev_ack = curr_ack;
 		curr_ack = rel_ackno;
 	}
@@ -261,7 +261,7 @@ void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 
 flowdata::flowdata()
 	: abs_seqno_min(0), abs_seqno_max(0), rel_seqno_max(UINT64_MAX)
-	, curr_ack(-1), prev_ack(-1)
+	, abs_ackno_min(0), abs_ackno_max(0), curr_ack(UINT64_MAX), prev_ack(UINT64_MAX)
 	, rtt_min(UINT64_MAX)
 {
 	ts_first.tv_sec = ts_first.tv_usec = 0;

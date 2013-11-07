@@ -56,7 +56,7 @@ class rangedata
 		/* Constructors and overloads for comparison operators */
 		rangedata(const timeval& timestamp);
 
-		rangedata(const rangedata& other)
+		inline rangedata(const rangedata& other)
 		{
 			*this = other;
 		};

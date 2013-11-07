@@ -44,7 +44,7 @@ class flow
 		};
 
 		bool operator<(const flow& other);
-		bool operator<(const flow& other) const 
+		inline bool operator<(const flow& other) const 
 		{ 
 			return const_cast<flow*>(this)->operator<(other); 
 		};
@@ -95,12 +95,11 @@ class flowdata
 	private:
 		/* Flow properties */
 		uint32_t abs_seqno_min;	// first absolute sequence number (used to handle seqno wrapping)
-		uint32_t abs_seqno_max;	// highest absolute sequence number registered (seqno wrapping)
-		uint64_t rel_seqno_max;	// highest relative sequence number registered (seqno wrapping)
+		uint32_t abs_seqno_max;	// latest absolute sequence number registered (seqno wrapping)
+		uint64_t rel_seqno_max;	// latest relative sequence number registered (seqno wrapping)
 
-		/* Helper method to handle sequence number wrapping */
-		inline uint64_t relative_seqno(uint32_t absolute_sequence_number);
-
+		uint32_t abs_ackno_min;	// first absolute acknowledgement number (ackno wrapping)
+		uint32_t abs_ackno_max;	// latest absolute acknowledgement number (ackno wrapping)
 		uint64_t curr_ack;  	// the current highest acknowledged (relative) sequence number
 		uint64_t prev_ack;  	// the previous highest acknowledged (relative) seqno
 
