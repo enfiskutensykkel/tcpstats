@@ -103,9 +103,6 @@ class flowdata
 		uint64_t curr_ack;  	// the current highest acknowledged (relative) sequence number
 		uint64_t prev_ack;  	// the previous highest acknowledged (relative) seqno
 
-		/* Helper method to handle sequence number wrapping */
-		inline uint64_t relative_ackno(uint32_t absolute_acknowledgement_number);
-
 		uint64_t rtt_min;		// the lowest registered delay (which we assume to be the RTT)
 		timeval ts_first,		// flow duration (first registered segment, and last registered segment)
 				ts_last;
