@@ -77,6 +77,7 @@ class flowdata
 		void register_ack(uint32_t ackno, const timeval& timestamp);
 
 		uint32_t total_retransmissions() const;
+		uint32_t total_dupacks() const;
 
 		/* Ctors, operators and const-correctness stuff */
 		flowdata();
@@ -90,14 +91,19 @@ class flowdata
 
 	private:
 		/* Flow properties */
-		uint32_t abs_seqno_first;	// first absolute sequence number (used to handle sequence number wrapping)
-		uint32_t abs_seqno_max;  	// highest absolute sequence number registered (used to handle seqno wrapping)
-		uint64_t rel_seqno_max;  	// highest relative sequence number registered (used to handle seqno wrapping)
+		uint32_t abs_seqno_min;	// first absolute sequence number (used to handle seqno wrapping)
+		uint32_t abs_seqno_max;	// highest absolute sequence number registered (seqno wrapping)
+		uint64_t rel_seqno_max;	// highest relative sequence number registered (seqno wrapping)
 
 		/* Helper method to handle sequence number wrapping */
 		inline uint64_t relative_seqno(uint32_t absolute_sequence_number);
 
-		uint64_t highest_ackd;	// the highest relative acknowledgement number received
+		uint64_t curr_ack;  	// the current highest acknowledged (relative) sequence number
+		uint64_t prev_ack;  	// the previous highest acknowledged (relative) seqno
+
+		/* Helper method to handle sequence number wrapping */
+		inline uint64_t relative_ackno(uint32_t absolute_acknowledgement_number);
+
 		uint64_t rtt_min;		// the lowest registered delay (which we assume to be the RTT)
 		timeval ts_first,		// flow duration (first registered segment, and last registered segment)
 				ts_last;
@@ -108,7 +114,6 @@ class flowdata
 
 		/* Helper methods to match and split ranges */
 		typedef std::list< rangedata* > range_list;
-		inline void find_ranges(range_list& list, const range& key);
 		inline void find_and_split_ranges(range_list& list, const range& key, bool include_new_data);
 
 		/* Data aggregated over intervals/time slices */

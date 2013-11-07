@@ -7,66 +7,49 @@
 #include <sys/time.h>
 #include <assert.h>
 
-#include <cstdio>
-
 /* Helper macros to check if X comes before Y */
-#define sequential(x, y)  ((int32_t) ((x) - (y)) < 0)
-#define isequential(x, y) ((int32_t) ((y) - (x)) >= 0)
+#define sequential(x, y)   ((int32_t) ((x) - (y)) < 0)
+#define i_sequential(x, y) ((int32_t) ((y) - (x)) >= 0)
+
 
 
 /* Helper function to handle sequence number wrapping */
-inline uint64_t flowdata::relative_seqno(uint32_t abs_current)
+inline uint64_t flowdata::relative_seqno(uint32_t seqno)
 {
-	uint64_t wrapped = abs_seqno_first + rel_seqno_max;
+	uint64_t wrapped = abs_seqno_min + rel_seqno_max;
 
-	if (abs_current < abs_seqno_max)
+	if (seqno < abs_seqno_max)
 	{
-		if (sequential(abs_current, abs_seqno_max))
+		if (sequential(seqno, abs_seqno_max))
 		{
 			// Retransmission of earlier sequence number
-			wrapped -= (abs_seqno_max - abs_current);
+			wrapped -= (abs_seqno_max - seqno);
 		}
 		else
 		{
 			// Sequence number has wrapped
-			wrapped += (0 - abs_seqno_max) + abs_current;
+			wrapped += (0 - abs_seqno_max) + seqno;
 		}
 
 	}
 	else
 	{
-		if (isequential(abs_seqno_max, abs_current))
+		if (i_sequential(abs_seqno_max, seqno))
 		{
 			// New sequence number
-			wrapped += (abs_current - abs_seqno_max);
+			wrapped += (seqno - abs_seqno_max);
+			// TODO: Update highest seqno here?
 		}
 		else
 		{
 			// Sequence number is older than abs_max, abs_max has wrapped
-			wrapped -= (0 - abs_current) - abs_seqno_max;
+			wrapped -= (0 - seqno) - abs_seqno_max;
 		}
 	}
 
 	// Return relative sequence number
-	return abs_current + ((wrapped / UINT32_MAX) * UINT32_MAX) - abs_seqno_first;
-}
-
-
-
-/*
- * Helper method to retrieve range matches.
- */
-inline void flowdata::find_ranges(range_list& list, const range& key)
-{
-	range_map::iterator lo, hi, it;
-
-	lo = ranges.lower_bound(key);
-	hi = ranges.upper_bound(key);
-
-	for (it = lo; it != hi; it++)
-	{
-		list.push_back(&it->second);
-	}
+	uint64_t rel_seqno = seqno + ((wrapped / (((uint64_t) UINT32_MAX) + 1)) * (((uint64_t) UINT32_MAX) + 1)) - abs_seqno_min;
+	return rel_seqno;
 }
 
 
@@ -111,10 +94,10 @@ inline void flowdata::find_and_split_ranges(range_list& list, const range& key, 
 	for (curr = next = lo; curr != last; curr = next)
 	{
 		++next;
-		const range& rrange = curr->first;
-		rangedata& data = curr->second;
+		const range& curr_range = curr->first;
+		rangedata& curr_data = curr->second;
 
-		if (key.seqno_lo <= rrange.seqno_lo && key.seqno_hi >= rrange.seqno_hi)
+		if (key.seqno_lo <= curr_range.seqno_lo && key.seqno_hi >= curr_range.seqno_hi)
 		{
 
 			// The new range overlaps this chunk completely
@@ -123,34 +106,34 @@ inline void flowdata::find_and_split_ranges(range_list& list, const range& key, 
 			ins = curr;
 		}
 
-		else if (key.seqno_lo > rrange.seqno_lo && key.seqno_hi < rrange.seqno_hi)
+		else if (key.seqno_lo > curr_range.seqno_lo && key.seqno_hi < curr_range.seqno_hi)
 		{
 			// The new range overlaps only part of this chunks, split into three chunks
 			// Existing range: |-----|
 			// New range:        |-| 
-			ranges.insert(curr, range_map::value_type(range(rrange.seqno_lo, key.seqno_lo), data));
-			ins = ranges.insert(curr, range_map::value_type(range(key.seqno_lo, key.seqno_hi), data));
-			ranges.insert(curr, range_map::value_type(range(key.seqno_hi, rrange.seqno_hi), data));
+			ranges.insert(curr, range_map::value_type(range(curr_range.seqno_lo, key.seqno_lo), curr_data));
+			ins = ranges.insert(curr, range_map::value_type(range(key.seqno_lo, key.seqno_hi), curr_data));
+			ranges.insert(curr, range_map::value_type(range(key.seqno_hi, curr_range.seqno_hi), curr_data));
 			ranges.erase(curr);
 		}
 
-		else if (key.seqno_lo > rrange.seqno_lo)
+		else if (key.seqno_lo > curr_range.seqno_lo)
 		{
 			// The new range overlaps the latter part of this chunk, split into two chunks
 			// Existing range: |-----|
 			// New range:        |---|
-			ranges.insert(curr, range_map::value_type(range(rrange.seqno_lo, key.seqno_lo), data));
-			ins = ranges.insert(curr, range_map::value_type(range(key.seqno_lo, rrange.seqno_hi), data));
+			ranges.insert(curr, range_map::value_type(range(curr_range.seqno_lo, key.seqno_lo), curr_data));
+			ins = ranges.insert(curr, range_map::value_type(range(key.seqno_lo, curr_range.seqno_hi), curr_data));
 			ranges.erase(curr);
 		}
 
-		else if (key.seqno_hi < rrange.seqno_hi)
+		else if (key.seqno_hi < curr_range.seqno_hi)
 		{
 			// The new range overlaps the former part of this chunk, split into two chunks
 			// Existing range: |-----|
 			// New range:      |---|
-			ins = ranges.insert(curr, range_map::value_type(range(rrange.seqno_lo, key.seqno_hi), data));
-			ranges.insert(curr, range_map::value_type(range(key.seqno_hi, rrange.seqno_hi), data));
+			ins = ranges.insert(curr, range_map::value_type(range(curr_range.seqno_lo, key.seqno_hi), curr_data));
+			ranges.insert(curr, range_map::value_type(range(key.seqno_hi, curr_range.seqno_hi), curr_data));
 			ranges.erase(curr);
 		}
 
@@ -173,13 +156,14 @@ inline void flowdata::find_and_split_ranges(range_list& list, const range& key, 
  */
 void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 {
-	if (rel_seqno_max == -1)
+	if (rel_seqno_max == UINT64_MAX)
 	{
-		abs_seqno_first = start;
-		abs_seqno_max = end;
+		abs_seqno_min = start;
+		abs_seqno_max = start;
 		rel_seqno_max = 0;
 
-		highest_ackd = rel_seqno_max;
+		curr_ack = rel_seqno_max;
+		prev_ack = rel_seqno_max;
 		rtt_min = -1;
 
 		ts_first = ts;
@@ -193,8 +177,8 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 
 	if (rel_end > rel_seqno_max)
 	{
-		rel_seqno_max = rel_end;
-		abs_seqno_max = end;
+		rel_seqno_max = rel_start;
+		abs_seqno_max = start;
 	}
 
 	// Check if there actually is any data to update
@@ -231,34 +215,40 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
  */
 void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 {
+	// TODO: We should make a relative_ackno function in case sequence numbers wrap more than once
 	uint64_t rel_ackno = relative_seqno(ackno);
 
-	// We assume that only TCP segments with ACK flag set is filtered in the trace
-	// We also assume that register_sent is called before register_ack
-	assert(rel_seqno_max != -1);
-	//assert(rel_ackno <= rel_seqno_max);
+	assert(rel_seqno_max != UINT64_MAX);
+	//assert(rel_ackno <= rel_seqno_max); // TODO
+
+	if (rel_ackno == 0 || (ackno - abs_seqno_min) == 1)
+	{
+		return;
+	}
 
 	range_list list;
 
-	if (rel_ackno < highest_ackd)
+	if (rel_ackno <= prev_ack)
 	{
-		// Old acknowledgement
-		range key(rel_ackno, highest_ackd);
+		assert(false);
+	}
+	else if (rel_ackno == curr_ack)
+	{
+		range key(prev_ack, curr_ack);
 		find_and_split_ranges(list, key, true);
 	}
-	else if (rel_ackno > highest_ackd)
+	else if (rel_ackno > curr_ack)
 	{
-		// New acknowledgement
-		range key(highest_ackd, rel_ackno);
+		range key(curr_ack, rel_ackno);
 		find_and_split_ranges(list, key, true);
 
-		highest_ackd = rel_ackno;
+		prev_ack = curr_ack;
+		curr_ack = rel_ackno;
 	}
-	else
+	else if (rel_ackno < curr_ack)
 	{
-		// Possible duplicate acknowledgement
-		range key(highest_ackd, highest_ackd+1);
-		find_ranges(list, key);
+		range key(prev_ack, rel_ackno);
+		find_and_split_ranges(list, key, true);
 	}
 
 	for (range_list::iterator it = list.begin(); it != list.end(); ++it)
@@ -269,23 +259,10 @@ void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 
 
 
-uint32_t flowdata::total_retransmissions() const
-{
-	uint32_t retr = 0;
-
-	for (range_map::const_iterator it = ranges.begin(); it != ranges.end(); it++)
-	{
-		retr += it->second.sent.size() - 1;
-	}
-
-	return retr;
-}
-
-
-
 flowdata::flowdata()
-	: abs_seqno_first(0), abs_seqno_max(0), rel_seqno_max(-1)
-	, highest_ackd(-1), rtt_min(-1)
+	: abs_seqno_min(0), abs_seqno_max(0), rel_seqno_max(UINT64_MAX)
+	, curr_ack(-1), prev_ack(-1)
+	, rtt_min(UINT64_MAX)
 {
 	ts_first.tv_sec = ts_first.tv_usec = 0;
 	ts_last.tv_sec = ts_last.tv_usec = 0;
@@ -297,12 +274,14 @@ flowdata& flowdata::operator=(const flowdata& rhs)
 {
 	// FIXME: Only copy the members that needs to be copied
 	// we should avoid deep-copies anyway
-	abs_seqno_first = rhs.abs_seqno_first;
+	abs_seqno_min = rhs.abs_seqno_min;
 	abs_seqno_max = rhs.abs_seqno_max;
 	rel_seqno_max = rhs.rel_seqno_max;
 
+	curr_ack = rhs.curr_ack;
+	prev_ack = rhs.prev_ack;
+
 	rtt_min = rhs.rtt_min;
-	highest_ackd = rhs.highest_ackd;
 
 	ts_first = rhs.ts_first;
 	ts_last = rhs.ts_last;

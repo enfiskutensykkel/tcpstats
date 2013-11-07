@@ -1,31 +1,14 @@
 #ifndef __TRACE_H__
 #define __TRACE_H__
 
-#include <pcap.h>
+#include <cstdio>
 #include <tr1/cstdint>
 #include <string>
 
 
-struct filter;
-
-
 
 /*
- * Set a BPF processing filter to reduce the data set.
- */
-void set_filter(pcap_t* handle, const filter& filter);
-
-
-
-/*
- * Analyze the streams.
- */
-void analyze_trace(pcap_t* handle);
-
-
-
-/*
- * A wrapper for creating a pcap BPF processing filter.
+ * A wrapper class for creating a processing filter.
  */
 struct filter
 {
@@ -38,5 +21,12 @@ struct filter
 
 	std::string str() const;
 };
+
+
+
+/*
+ * Analyze the streams.
+ */
+void analyze_trace(FILE* trace_file, const filter& processing_filter);
 
 #endif

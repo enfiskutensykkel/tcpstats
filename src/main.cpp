@@ -1,10 +1,11 @@
+#include <stdexcept>
 #include <cstdio>
 #include <vector>
-#include <pcap.h>
 #include "trace.h"
 #include "flow.h"
 
 using std::vector;
+
 
 
 int main(int argc, char** argv)
@@ -15,14 +16,18 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	char errbuf[PCAP_ERRBUF_SIZE];
 	filter f;
 
-	pcap_t* handle = pcap_open_offline(argv[1], errbuf);
-
-	set_filter(handle, f);
-
-	analyze_trace(handle);
+	try
+	{
+		FILE* fp = fopen(argv[1], "r");
+		analyze_trace(fp, f);
+		fclose(fp);
+	}
+	catch (const std::runtime_error& e)
+	{
+		fprintf(stderr, "Unexpected error: %s\n", e.what());
+	}
 
 	vector<const flow*> connections;
 	vector<const flowdata*> data;
@@ -32,10 +37,8 @@ int main(int argc, char** argv)
 
 	for (unsigned i = 0; i < count; ++i)
 	{
-		printf("%s has %u retransmissions\n", connections[i]->id().c_str(), data[i]->total_retransmissions());
+		printf("%s has %u retransmissions and %u dupacks\n", connections[i]->id().c_str(), data[i]->total_retransmissions(), data[i]->total_dupacks());
 	}
-
-	pcap_close(handle);
 
 	return 0;
 }
