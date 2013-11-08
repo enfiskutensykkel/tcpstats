@@ -88,6 +88,7 @@ class flowdata
 		uint32_t total_retrans() const;
 		uint32_t max_num_retrans() const;
 		uint32_t total_dupacks() const;
+		uint32_t max_num_dupacks() const;
 		uint64_t unique_bytes_sent() const;
 		uint64_t rtt() const;
 		uint64_t duration() const;
@@ -113,7 +114,6 @@ class flowdata
 		uint64_t curr_ack;  	// the current highest acknowledged (relative) sequence number
 		uint64_t prev_ack;  	// the previous highest acknowledged (relative) seqno
 
-		uint64_t rtt_min;		// the lowest registered delay (which we assume to be the RTT)
 		timeval ts_first,		// flow duration (first registered segment, and last registered segment)
 				ts_last;
 

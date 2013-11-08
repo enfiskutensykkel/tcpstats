@@ -255,11 +255,6 @@ void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 	// Update acknowledgement times for all the matching ranges
 	for (range_list::iterator it = list.begin(); it != list.end(); ++it)
 	{
-		if ((USECS(ts) - USECS((*it)->sent.back())) < rtt_min)
-		{
-			rtt_min = (USECS(ts) - USECS((*it)->sent.back()));
-		}
-
 		(*it)->ackd.push_back(ts);
 	}
 }
@@ -269,7 +264,6 @@ void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 flowdata::flowdata()
 	: abs_seqno_min(0), abs_seqno_max(0), rel_seqno_max(UINT64_MAX)
 	, abs_ackno_min(0), abs_ackno_max(0), curr_ack(UINT64_MAX), prev_ack(UINT64_MAX)
-	, rtt_min(UINT64_MAX)
 {
 	ts_first.tv_sec = ts_first.tv_usec = 0;
 	ts_last.tv_sec = ts_last.tv_usec = 0;
@@ -285,10 +279,10 @@ flowdata& flowdata::operator=(const flowdata& rhs)
 	abs_seqno_max = rhs.abs_seqno_max;
 	rel_seqno_max = rhs.rel_seqno_max;
 
+	abs_ackno_min = rhs.abs_ackno_min;
+	abs_ackno_max = rhs.abs_ackno_max;
 	curr_ack = rhs.curr_ack;
 	prev_ack = rhs.prev_ack;
-
-	rtt_min = rhs.rtt_min;
 
 	ts_first = rhs.ts_first;
 	ts_last = rhs.ts_last;

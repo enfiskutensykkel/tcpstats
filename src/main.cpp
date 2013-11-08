@@ -44,7 +44,7 @@ int main(int argc, char** argv)
 		printf("%s has sent %lu unique bytes\n", f->id().c_str(), d->unique_bytes_sent());
 		printf("%s has %u (%u) retransmissions\n", f->id().c_str(), d->total_retrans(), d->max_num_retrans());
 		printf("%s has RTT %.2f ms\n", f->id().c_str(), d->rtt() / 1000.0);
-		printf("%s has %u dupacks\n", f->id().c_str(), d->total_dupacks());
+		printf("%s has %u (%u) dupacks\n", f->id().c_str(), d->total_dupacks(), d->max_num_dupacks());
 		printf("%s lasted %.2f seconds\n", f->id().c_str(), d->duration() / 1000000.0);
 
 		printf("\n");
