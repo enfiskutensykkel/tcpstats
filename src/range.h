@@ -2,14 +2,11 @@
 #define __RANGE_H__
 
 #include <vector>
-#include <sys/time.h>
 #include <tr1/cstdint>
 
 
-/* Forward declaration of flowdata */
+
 class flowdata;
-
-
 
 /*
  * A range object represents a byte range (typically payload of a TCP segment).
@@ -46,6 +43,7 @@ class range
 				return true;
 			if (seqno_lo >= rhs.seqno_hi)
 				return false;
+
 			return false;
 		};
 
@@ -65,31 +63,39 @@ class rangedata
 	friend class flowdata;
 
 	public:
-	
-		/* The elapsed time between when the range first was sent until it got ACK'ed */
-		timeval latency();
 
 		/* Constructors and overloads for comparison operators */
-		inline rangedata(const timeval& timestamp)
+		inline rangedata()
+			: tx(0), rx(0)
 		{
-			sent.push_back(timestamp);
 		};
 
-		inline rangedata(const rangedata& other)
+		inline rangedata(uint64_t timestamp)
+			: tx(1), rx(0)
 		{
-			*this = other;
+			evt.push_back(true);
+			ts.push_back(timestamp);
+		};
+
+		inline rangedata(const rangedata& rhs)
+		{
+			*this = rhs;
 		};
 
 		inline rangedata& operator=(const rangedata& rhs)
 		{
-			sent = rhs.sent;
-			ackd = rhs.ackd;
+			evt = rhs.evt;
+			ts = rhs.ts;
+			tx = rhs.tx;
+			rx = rhs.rx;
 			return *this;
 		};
 
 	private: 
-		std::vector<timeval> sent;	// the timestamps this range was registered as sent
-		std::vector<timeval> ackd;	// the timestamps this range was acknowledged
+		std::vector<bool> evt;
+		std::vector<uint64_t> ts;
+		uint64_t tx;
+		uint64_t rx;
 };
 
 #endif

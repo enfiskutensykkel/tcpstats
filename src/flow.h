@@ -9,7 +9,6 @@
 #include <list>
 #include "range.h"
 
-
 /*
  * Macro to convert a struct timeval into a number of microseconds
  */
@@ -18,7 +17,6 @@
 
 
 class flowdata;
-
 
 /* 
  * A flow object represents a one-way connection.
@@ -116,6 +114,8 @@ class flowdata
 
 		timeval ts_first,		// flow duration (first registered segment, and last registered segment)
 				ts_last;
+
+		uint64_t rtt_min;
 
 		/* A map over byte ranges and data about them */
 		typedef std::multimap< range, rangedata > range_map;

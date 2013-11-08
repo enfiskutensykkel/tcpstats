@@ -196,14 +196,16 @@ void flowdata::register_sent(uint32_t start, uint32_t end, const timeval& ts)
 	if (list.empty())
 	{
 		// We have a completely new range
-		ranges.insert(std::pair<range,rangedata>(key, ts));
+		ranges.insert(std::pair<range,rangedata>(key, USECS(ts)));
 	}
 	else
 	{
 		// Update existing ranges' transmission count
 		for (range_list::iterator it = list.begin(); it != list.end(); ++it)
 		{
-			(*it)->sent.push_back(ts);
+			(*it)->evt.push_back(true);
+			(*it)->ts.push_back(USECS(ts));
+			(*it)->tx++;
 		}
 	}
 }
@@ -255,7 +257,18 @@ void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 	// Update acknowledgement times for all the matching ranges
 	for (range_list::iterator it = list.begin(); it != list.end(); ++it)
 	{
-		(*it)->ackd.push_back(ts);
+		if ((*it)->evt.back())
+		{
+			uint64_t time = (*it)->ts.back();
+			if ((USECS(ts) - time) < rtt_min)
+			{
+				rtt_min = USECS(ts) - time;
+			}
+		}
+
+		(*it)->evt.push_back(false);
+		(*it)->ts.push_back(USECS(ts));
+		(*it)->rx++;
 	}
 }
 
@@ -264,6 +277,7 @@ void flowdata::register_ack(uint32_t ackno, const timeval& ts)
 flowdata::flowdata()
 	: abs_seqno_min(0), abs_seqno_max(0), rel_seqno_max(UINT64_MAX)
 	, abs_ackno_min(0), abs_ackno_max(0), curr_ack(UINT64_MAX), prev_ack(UINT64_MAX)
+	, rtt_min(UINT64_MAX)
 {
 	ts_first.tv_sec = ts_first.tv_usec = 0;
 	ts_last.tv_sec = ts_last.tv_usec = 0;

@@ -5,16 +5,15 @@
 #include <sys/time.h>
 
 
+
 uint32_t flowdata::total_retrans() const
 {
 	uint32_t retr = 0;
 
-
 	for (range_map::const_iterator it = ranges.begin(); it != ranges.end(); it++)
 	{
-		int32_t retries = it->second.sent.size() - it->second.ackd.size();
-
-		retr += retries > 0 ? retries : 0;
+		int32_t r = it->second.tx - it->second.rx;
+		retr += r > 0 ? r : 0;
 	}
 
 	return retr;
@@ -24,18 +23,15 @@ uint32_t flowdata::total_retrans() const
 
 uint32_t flowdata::max_num_retrans() const
 {
-	uint32_t max = 0;
+	int32_t max = 0;
 
 	for (range_map::const_iterator it = ranges.begin(); it != ranges.end(); it++)
 	{
-		int32_t size = it->second.sent.size() - it->second.ackd.size();
-		if (size > 0 && (uint64_t) size > max)
-		{
-			max = size;
-		}
+		int32_t r = it->second.tx - it->second.rx;
+		max = r > max ? r : max;
 	}
 
-	return max;
+	return (uint32_t) max;
 }
 
 
@@ -46,10 +42,10 @@ uint32_t flowdata::max_num_dupacks() const
 
 	for (range_map::const_iterator it = ranges.begin(); it != ranges.end(); it++)
 	{
-		uint32_t n = it->second.ackd.size();
-		if (n > 1 && (n - 1) > dupacks)
+		int32_t d = it->second.rx - it->second.tx;
+		if (d > 0 && (uint32_t) d > dupacks)
 		{
-			dupacks = n;
+			dupacks = d;
 		}
 	}
 
@@ -64,8 +60,8 @@ uint32_t flowdata::total_dupacks() const
 
 	for (range_map::const_iterator it = ranges.begin(); it != ranges.end(); it++)
 	{
-		int32_t size = it->second.ackd.size() - it->second.sent.size();
-		dupacks += size > 0 ? size : 0;
+		int32_t d = it->second.rx - it->second.tx;
+		dupacks += d > 0 ? d : 0;
 	}
 
 	return dupacks;
@@ -89,22 +85,37 @@ uint64_t flowdata::unique_bytes_sent() const
 
 uint64_t flowdata::rtt() const
 {
+	return rtt_min;
 	uint64_t rtt = UINT64_MAX;
 
 	for (range_map::const_iterator it = ranges.begin(); it != ranges.end(); it++)
 	{
-		if (!it->second.ackd.empty())
+		if (it->second.rx > 0)
 		{
 			const rangedata& data = it->second;
-			uint64_t time = USECS(data.ackd.back()) - USECS(data.sent.back());
-			if (time < rtt)
+
+			uint64_t idx = 0;
+			uint64_t tx_count = data.tx;
+
+			while (tx_count > 0)
 			{
-				rtt = time;
+				if (data.evt[idx])
+				{
+					--tx_count;
+				}
+			}
+
+			uint64_t last_tx = data.ts.at(idx);
+			uint64_t last_rx = data.ts.at(idx+1);
+
+			if ((last_rx - last_tx) < rtt)
+			{
+				rtt = last_rx - last_tx;
 			}
 		}
 	}
 
-	return rtt;
+	return rtt != UINT64_MAX ? rtt : 0;
 }
 
 
