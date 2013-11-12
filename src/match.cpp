@@ -303,3 +303,15 @@ flowdata& flowdata::operator=(const flowdata& rhs)
 
 	return *this;
 }
+
+
+
+#ifdef DEBUG
+#include "testfuncs.h"
+
+bool test_range_matching(ob output)
+{
+	output << "test";
+	return false;
+}
+#endif

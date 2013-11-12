@@ -1,6 +1,6 @@
 ### Makefile for tcpstats ###
 PROJECT=tcpstats
-DEFINES=ETHERNET_FRAME_SIZE=14 # DEBUG
+DEFINES=ETHERNET_FRAME_SIZE=14 DEBUG
 OBJ_DIR=build
 SRC_DIR=src
 
